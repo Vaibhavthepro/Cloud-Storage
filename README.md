@@ -1,6 +1,6 @@
 # CloudVault ☁️🔒
 
-![CloudVault Screenshot](./frontend/screenshot.png)
+![CloudVault Dashboard](./frontend/dashboard.png)
 
 A modern, high-performance, and secure cloud storage platform. CloudVault enables users to effortlessly store, organize, and share their files and folders with real-time virus scanning and secure sharing capabilities.
 
