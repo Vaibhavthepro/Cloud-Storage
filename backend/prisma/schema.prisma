@@ -1,0 +1,154 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum TransferStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+model User {
+  id             String         @id @default(uuid())
+  name           String
+  email          String         @unique
+  passwordHash   String
+  role           Role           @default(USER)
+  storageQuota   BigInt         @default(1073741824) // 1GB default
+  storageUsed    BigInt         @default(0)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  
+  files          File[]
+  folders        Folder[]
+  shares         Share[]
+  activityLogs   ActivityLog[]
+  sharedByMe     UserShare[]       @relation("SharedBy")
+  sharedWithMe   UserShare[]       @relation("SharedWith")
+  folderSharedByMe     UserFolderShare[] @relation("FolderSharedBy")
+  folderSharedWithMe   UserFolderShare[] @relation("FolderSharedWith")
+}
+
+model Folder {
+  id             String         @id @default(uuid())
+  name           String
+  parentId       String?
+  parent         Folder?        @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  subfolders     Folder[]       @relation("FolderHierarchy")
+  ownerId        String
+  owner          User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  
+  files          File[]
+  folderShares   UserFolderShare[]
+}
+
+model PhysicalStorage {
+  id             String         @id @default(uuid())
+  hash           String         @unique // SHA-256 hash for duplicate detection
+  storagePath    String
+  size           BigInt
+  referenceCount Int            @default(1)
+  createdAt      DateTime       @default(now())
+  
+  files          File[]
+}
+
+model File {
+  id             String         @id @default(uuid())
+  originalName   String
+  mimeType       String
+  extension      String
+  size           BigInt
+  isInfected     Boolean        @default(false)
+  
+  folderId       String?
+  folder         Folder?        @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  
+  ownerId        String
+  owner          User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  
+  physicalId     String
+  physicalFile   PhysicalStorage @relation(fields: [physicalId], references: [id], onDelete: Cascade)
+  
+  uploadedAt     DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  shares         Share[]
+  virusLogs      VirusLog[]
+  userShares     UserShare[]
+}
+
+model Share {
+  id             String         @id @default(uuid())
+  fileId         String
+  file           File           @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  ownerId        String
+  owner          User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  isPublic       Boolean        @default(false)
+  passwordHash   String?
+  expiryDate     DateTime?
+  downloads      Int            @default(0)
+  createdAt      DateTime       @default(now())
+}
+
+model ActivityLog {
+  id             String         @id @default(uuid())
+  userId         String
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action         String         // e.g., UPLOAD, DOWNLOAD, DELETE
+  entityType     String         // e.g., FILE, FOLDER, USER
+  entityId       String?
+  ipAddress      String?
+  timestamp      DateTime       @default(now())
+}
+
+model VirusLog {
+  id             String         @id @default(uuid())
+  fileId         String
+  file           File           @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  scanResult     String         // CLEAN, INFECTED, ERROR
+  details        String?
+  scannedAt      DateTime       @default(now())
+}
+
+model UserShare {
+  id             String         @id @default(uuid())
+  fileId         String
+  file           File           @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  sharedById     String
+  sharedBy       User           @relation("SharedBy", fields: [sharedById], references: [id], onDelete: Cascade)
+  sharedWithId   String
+  sharedWith     User           @relation("SharedWith", fields: [sharedWithId], references: [id], onDelete: Cascade)
+  status         TransferStatus @default(PENDING)
+  createdAt      DateTime       @default(now())
+
+  @@unique([fileId, sharedWithId])
+}
+
+model UserFolderShare {
+  id             String         @id @default(uuid())
+  folderId       String
+  folder         Folder         @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  sharedById     String
+  sharedBy       User           @relation("FolderSharedBy", fields: [sharedById], references: [id], onDelete: Cascade)
+  sharedWithId   String
+  sharedWith     User           @relation("FolderSharedWith", fields: [sharedWithId], references: [id], onDelete: Cascade)
+  status         TransferStatus @default(PENDING)
+  createdAt      DateTime       @default(now())
+
+  @@unique([folderId, sharedWithId])
+}
