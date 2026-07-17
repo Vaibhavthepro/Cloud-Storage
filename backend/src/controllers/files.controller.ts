@@ -308,17 +308,6 @@ export const toggleStarFile = async (req: Request | any, res: Response, next: Ne
       data: { starred: !file.starred }
     });
 
-    await prisma.activityLog.create({
-      data: {
-        userId,
-        action: updatedFile.starred ? 'STAR_FILE' : 'UNSTAR_FILE',
-        entityType: 'FILE',
-        entityId: id,
-        entityName: file.originalName,
-        ipAddress: req.ip || req.connection.remoteAddress
-      }
-    });
-
     res.status(200).json({
       success: true,
       message: updatedFile.starred ? 'File starred' : 'File unstarred',

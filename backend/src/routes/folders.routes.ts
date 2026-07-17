@@ -219,17 +219,6 @@ export const toggleStarFolder = async (req: Request | any, res: Response, next: 
       data: { starred: !folder.starred }
     });
 
-    await prisma.activityLog.create({
-      data: {
-        userId,
-        action: updatedFolder.starred ? 'STAR_FOLDER' : 'UNSTAR_FOLDER',
-        entityType: 'FOLDER',
-        entityId: id,
-        entityName: folder.name,
-        ipAddress: req.ip || req.connection.remoteAddress
-      }
-    });
-
     res.status(200).json({
       success: true,
       message: updatedFolder.starred ? 'Folder starred' : 'Folder unstarred',
