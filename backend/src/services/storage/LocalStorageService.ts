@@ -34,12 +34,12 @@ export class LocalStorageService implements StorageProvider {
     return fullPath;
   }
 
-  async download(filePath: string): Promise<NodeJS.ReadableStream> {
+  async download(filePath: string, options?: { start?: number; end?: number }): Promise<NodeJS.ReadableStream> {
     const fullPath = this.getFullPath(filePath);
     if (!fs.existsSync(fullPath)) {
       throw new Error('File not found');
     }
-    return fs.createReadStream(fullPath);
+    return fs.createReadStream(fullPath, options);
   }
 
   async delete(filePath: string): Promise<boolean> {

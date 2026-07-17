@@ -33,12 +33,15 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
     const count = await prisma.user.count();
     const role = count === 0 ? 'ADMIN' : 'USER';
 
+    const defaultQuota = process.env.DEFAULT_STORAGE_QUOTA ? BigInt(process.env.DEFAULT_STORAGE_QUOTA) : BigInt(1073741824);
+
     const user = await prisma.user.create({
       data: {
         name,
         email,
         passwordHash,
         role,
+        storageQuota: defaultQuota
       },
     });
 
@@ -48,6 +51,7 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
         action: 'REGISTER',
         entityType: 'USER',
         entityId: user.id,
+        entityName: user.name,
         ipAddress: req.ip
       }
     });
@@ -91,6 +95,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
         action: 'LOGIN',
         entityType: 'USER',
         entityId: user.id,
+        entityName: user.name,
         ipAddress: req.ip
       }
     });
@@ -112,7 +117,9 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
 
 export const getProfile = async (req: Request | any, res: Response, next: NextFunction) => {
   try {
-    const user = await prisma.user.findUnique({
+    const defaultQuota = process.env.DEFAULT_STORAGE_QUOTA ? BigInt(process.env.DEFAULT_STORAGE_QUOTA) : BigInt(1073741824);
+
+    let user = await prisma.user.findUnique({
       where: { id: req.user.id },
       select: {
         id: true,
@@ -129,12 +136,28 @@ export const getProfile = async (req: Request | any, res: Response, next: NextFu
       return next(new AppError('User not found', 404));
     }
 
+    if (user.storageQuota < defaultQuota) {
+      user = await prisma.user.update({
+        where: { id: req.user.id },
+        data: { storageQuota: defaultQuota },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          storageQuota: true,
+          storageUsed: true,
+          createdAt: true
+        }
+      });
+    }
+
     // Convert BigInt to string to avoid JSON serialization error
     const userResponse = {
       ...user,
       storageQuota: user.storageQuota.toString(),
       storageUsed: user.storageUsed.toString()
-    }
+    };
 
     res.status(200).json({
       success: true,
@@ -174,12 +197,15 @@ export const googleLogin = async (req: Request, res: Response, next: NextFunctio
       const salt = await bcrypt.genSalt(10);
       const randomPassword = await bcrypt.hash(sub + Date.now().toString(), salt);
       
+      const defaultQuota = process.env.DEFAULT_STORAGE_QUOTA ? BigInt(process.env.DEFAULT_STORAGE_QUOTA) : BigInt(1073741824);
+
       user = await prisma.user.create({
         data: {
           name: name || 'Google User',
           email,
           passwordHash: randomPassword,
           role,
+          storageQuota: defaultQuota
         },
       });
       
@@ -189,6 +215,7 @@ export const googleLogin = async (req: Request, res: Response, next: NextFunctio
           action: 'REGISTER_GOOGLE',
           entityType: 'USER',
           entityId: user.id,
+          entityName: user.name,
           ipAddress: req.ip
         }
       });
@@ -199,6 +226,7 @@ export const googleLogin = async (req: Request, res: Response, next: NextFunctio
           action: 'LOGIN_GOOGLE',
           entityType: 'USER',
           entityId: user.id,
+          entityName: user.name,
           ipAddress: req.ip
         }
       });

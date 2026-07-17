@@ -1,10 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { FileService } from '../services/FileService';
+import { ChunkUploadService } from '../services/ChunkUploadService';
 import { AppError } from '../utils/AppError';
 import prisma from '../config/db';
 import { hasFolderAccess } from '../utils/permissions';
 
 const fileService = new FileService();
+const chunkUploadService = new ChunkUploadService();
 
 export const uploadFile = async (req: Request | any, res: Response, next: NextFunction) => {
   try {
@@ -16,9 +18,19 @@ export const uploadFile = async (req: Request | any, res: Response, next: NextFu
     const userId = req.user.id;
 
     // Check storage quota
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (user && user.storageUsed + BigInt(req.file.size) > user.storageQuota) {
-      return next(new AppError('Storage quota exceeded', 400));
+    let user = await prisma.user.findUnique({ where: { id: userId } });
+    if (user) {
+      const defaultQuota = process.env.DEFAULT_STORAGE_QUOTA ? BigInt(process.env.DEFAULT_STORAGE_QUOTA) : BigInt(1073741824);
+      if (user.storageQuota < defaultQuota) {
+        user = await prisma.user.update({
+          where: { id: userId },
+          data: { storageQuota: defaultQuota }
+        });
+      }
+
+      if (user.storageUsed + BigInt(req.file.size) > user.storageQuota) {
+        return next(new AppError('Storage quota exceeded', 400));
+      }
     }
 
     const fileRecord = await fileService.handleUpload(userId, req.file, folderId);
@@ -33,6 +45,131 @@ export const uploadFile = async (req: Request | any, res: Response, next: NextFu
       success: true,
       message: 'File uploaded successfully',
       data: responseFile
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const initiateChunkUpload = async (req: Request | any, res: Response, next: NextFunction) => {
+  try {
+    const { filename, size, mimeType, folderId } = req.body;
+    const userId = req.user.id;
+
+    if (!filename || size === undefined || !mimeType) {
+      return next(new AppError('Filename, size, and mimeType are required', 400));
+    }
+
+    const sessionInfo = await chunkUploadService.initiateUpload(
+      userId,
+      filename,
+      parseInt(size, 10),
+      mimeType,
+      folderId
+    );
+
+    res.status(201).json({
+      success: true,
+      data: sessionInfo
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getChunkUploadStatus = async (req: Request | any, res: Response, next: NextFunction) => {
+  try {
+    const { uploadId } = req.query;
+    const userId = req.user.id;
+
+    if (!uploadId) {
+      return next(new AppError('uploadId query parameter is required', 400));
+    }
+
+    const status = await chunkUploadService.getUploadStatus(userId, String(uploadId));
+
+    res.status(200).json({
+      success: true,
+      data: status
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const uploadChunk = async (req: Request | any, res: Response, next: NextFunction) => {
+  try {
+    const uploadId = req.headers['x-upload-id'];
+    const chunkIndexStr = req.headers['x-chunk-index'];
+    const checksum = req.headers['x-chunk-checksum'];
+    const sizeStr = req.headers['x-chunk-size'];
+    const userId = req.user.id;
+
+    if (!uploadId || chunkIndexStr === undefined || !checksum || !sizeStr) {
+      return next(new AppError('x-upload-id, x-chunk-index, x-chunk-checksum, and x-chunk-size headers are required', 400));
+    }
+
+    const chunkIndex = parseInt(String(chunkIndexStr), 10);
+    const size = parseInt(String(sizeStr), 10);
+
+    await chunkUploadService.saveChunk(
+      userId,
+      String(uploadId),
+      chunkIndex,
+      String(checksum),
+      size,
+      req
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Chunk uploaded successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const completeChunkUpload = async (req: Request | any, res: Response, next: NextFunction) => {
+  try {
+    const { uploadId } = req.body;
+    const userId = req.user.id;
+
+    if (!uploadId) {
+      return next(new AppError('uploadId is required', 400));
+    }
+
+    const fileRecord = await chunkUploadService.completeUpload(userId, String(uploadId));
+
+    const responseFile = {
+      ...fileRecord,
+      size: fileRecord.size.toString()
+    };
+
+    res.status(201).json({
+      success: true,
+      message: 'File uploaded successfully',
+      data: responseFile
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const cancelChunkUpload = async (req: Request | any, res: Response, next: NextFunction) => {
+  try {
+    const { uploadId } = req.body;
+    const userId = req.user.id;
+
+    if (!uploadId) {
+      return next(new AppError('uploadId is required', 400));
+    }
+
+    await chunkUploadService.cancelUpload(userId, String(uploadId));
+
+    res.status(200).json({
+      success: true,
+      message: 'Upload cancelled successfully'
     });
   } catch (error) {
     next(error);
@@ -89,11 +226,43 @@ export const downloadFile = async (req: Request | any, res: Response, next: Next
       return next(new AppError('Unauthorized to download this file', 403));
     }
 
-    // Now proceed to get the download stream (bypass ownership check inside service if possible, or we may need to adjust FileService too)
-    const { stream, filename, mimeType } = await fileService.getDownloadStream(id, file.ownerId);
+    const rangeHeader = req.headers.range;
+    let stream;
+    const totalSize = Number(file.size);
 
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Content-Type', mimeType);
+    if (rangeHeader) {
+      const parts = rangeHeader.replace(/bytes=/, "").split("-");
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : totalSize - 1;
+
+      if (isNaN(start) || start >= totalSize || end >= totalSize || start > end) {
+        res.setHeader('Content-Range', `bytes */${totalSize}`);
+        res.status(416).end();
+        return;
+      }
+
+      const chunksize = (end - start) + 1;
+      const downloadResult = await fileService.getDownloadStream(id, file.ownerId, { start, end });
+      stream = downloadResult.stream;
+
+      res.writeHead(206, {
+        'Content-Range': `bytes ${start}-${end}/${totalSize}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': chunksize,
+        'Content-Type': file.mimeType,
+        'Content-Disposition': `attachment; filename="${file.originalName}"`
+      });
+    } else {
+      const downloadResult = await fileService.getDownloadStream(id, file.ownerId);
+      stream = downloadResult.stream;
+
+      res.writeHead(200, {
+        'Content-Length': totalSize,
+        'Content-Type': file.mimeType,
+        'Content-Disposition': `attachment; filename="${file.originalName}"`,
+        'Accept-Ranges': 'bytes'
+      });
+    }
 
     stream.pipe(res);
   } catch (error) {

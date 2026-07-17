@@ -30,7 +30,8 @@ export const createFolder = async (req: Request | any, res: Response, next: Next
         userId,
         action: 'CREATE_FOLDER',
         entityType: 'FOLDER',
-        entityId: folder.id
+        entityId: folder.id,
+        entityName: folder.name
       }
     });
 
@@ -78,6 +79,16 @@ export const deleteFolder = async (req: Request | any, res: Response, next: Next
     // For simplicity in this demo, let's just delete the DB record. The physical files might be orphaned,
     // which requires a cleanup cron job later.
     
+    await prisma.activityLog.create({
+      data: {
+        userId,
+        action: 'DELETE_FOLDER',
+        entityType: 'FOLDER',
+        entityId: id,
+        entityName: folder.name
+      }
+    });
+
     await prisma.folder.delete({ where: { id } });
 
     res.status(200).json({ success: true, message: 'Folder deleted' });
@@ -174,6 +185,7 @@ export const downloadFolder = async (req: Request | any, res: Response, next: Ne
         action: 'DOWNLOAD_FOLDER',
         entityType: 'FOLDER',
         entityId: id,
+        entityName: folder.name,
         ipAddress: req.ip
       }
     });

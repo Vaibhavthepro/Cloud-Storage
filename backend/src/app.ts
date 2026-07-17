@@ -23,6 +23,10 @@ const limiter = rateLimit({
   max: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting for chunk uploads since large files require more than 100 requests
+    return req.originalUrl.includes('/files/upload/chunk');
+  }
 });
 app.use('/api', limiter);
 
@@ -32,6 +36,7 @@ import folderRoutes from './routes/folders.routes';
 import searchRoutes from './routes/search.routes';
 import dashboardRoutes from './routes/dashboard.routes';
 import sharesRoutes from './routes/shares.routes';
+import adminRoutes from './routes/admin.routes';
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -40,6 +45,7 @@ app.use('/api/folders', folderRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/shares', sharesRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'UP', message: 'Cloud Storage API is running' });

@@ -5,7 +5,7 @@ export interface StorageMetadata {
 
 export interface StorageProvider {
   upload(filePath: string, fileStream: Buffer | NodeJS.ReadableStream): Promise<string>;
-  download(filePath: string): Promise<NodeJS.ReadableStream>;
+  download(filePath: string, options?: { start?: number; end?: number }): Promise<NodeJS.ReadableStream>;
   delete(filePath: string): Promise<boolean>;
   move(sourcePath: string, destinationPath: string): Promise<boolean>;
   copy(sourcePath: string, destinationPath: string): Promise<boolean>;

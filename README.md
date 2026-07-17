@@ -6,13 +6,15 @@ A modern, high-performance, and secure cloud storage platform. CloudVault enable
 
 ## ✨ Features
 
-- **Secure Storage**: Upload, manage, and download files with seamless local storage provisioning.
-- **Folder Organization**: Create unlimited folder structures with support for zipping and downloading entire folder trees on-the-fly.
-- **Secure File/Folder Sharing**: Share files and folders with other users seamlessly. Includes Transfer Requests and Accepted items views.
-- **Security First**: Integrated with ClamAV to automatically scan all uploaded files for viruses and malware.
-- **Modern Authentication**: Fully JWT-based authentication system for secure login and session management.
-- **Stunning UI/UX**: Built with React, Vite, and custom CSS for a glassy, responsive, and beautiful experience.
-- **Containerized Architecture**: Designed to be entirely deployed via Docker Compose (Frontend, Backend, DB, Proxy, ClamAV).
+- **Resumable Chunked Uploads**: Large files are automatically split and uploaded in 10MB chunks with full pause, resume, cancel, and automatic network retry support.
+- **Recursive Folder Uploads**: Upload entire directory structures directly. The system automatically creates matching nested folder paths and places files accordingly.
+- **Interactive Drag & Drop**: Drop folders or multiple files directly onto the storage workspace grid to upload them recursively.
+- **Range-Based Downloads & Streaming**: Supports HTTP range requests, enabling users to stream video/audio with seek capability and resume paused downloads.
+- **Detailed Activity Logging**: Tracks and logs all user operations (uploads, deletes, logins) along with the exact file and folder names for admins.
+- **Secure Storage & Sharing**: Share files and folders with other users seamlessly, managed via transfer requests and access control.
+- **Security First**: Real-time integration with ClamAV daemon to scan every uploaded file/chunk for malware before final assembly.
+- **Modern Auth & Glassy UI**: Fully JWT-secured sessions paired with a premium, responsive glassmorphism dark-theme dashboard.
+- **Fully Containerized**: Ready to spin up in seconds with a single command via Docker Compose (Nginx reverse proxy, React Frontend, Node Backend, PostgreSQL Database, ClamAV).
 
 ## 🚀 Getting Started
 

@@ -6,6 +6,20 @@ import { Cloud, Folder, HardDrive, LogOut, ShieldAlert } from 'lucide-react';
 const Sidebar = () => {
   const { user, logout } = useContext(AuthContext);
 
+  const formatSize = (bytesStr: string | number | undefined) => {
+    if (!bytesStr) return '0 B';
+    const bytes = typeof bytesStr === 'string' ? parseInt(bytesStr, 10) : bytesStr;
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const used = user?.storageUsed ? parseInt(user.storageUsed, 10) : 0;
+  const quota = user?.storageQuota ? parseInt(user.storageQuota, 10) : 1073741824;
+  const percent = quota > 0 ? Math.min(100, Math.round((used / quota) * 100)) : 0;
+
   const navItemStyle = (isActive: boolean) => ({
     display: 'flex',
     alignItems: 'center',
@@ -51,6 +65,20 @@ const Sidebar = () => {
       </nav>
 
       <div style={{ padding: '1.5rem 0 0', borderTop: '1px solid var(--border-color)' }}>
+        {/* Storage quota progress bar */}
+        <div style={{ padding: '0 0.5rem', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.5rem', fontWeight: 500 }}>
+            <span style={{ color: 'var(--text-muted)' }}>Storage Used</span>
+            <span>{percent}%</span>
+          </div>
+          <div style={{ width: '100%', height: '6px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '3px', overflow: 'hidden', marginBottom: '0.5rem' }}>
+            <div style={{ width: `${percent}%`, height: '100%', background: 'var(--primary)', borderRadius: '3px' }} />
+          </div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            {formatSize(used)} of {formatSize(quota)}
+          </div>
+        </div>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', padding: '0 0.5rem' }}>
           <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
             {user?.name.charAt(0).toUpperCase()}

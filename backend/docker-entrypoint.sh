@@ -9,7 +9,7 @@ npx prisma generate
 
 # Run Prisma Migrations
 echo "Running Prisma Migrations..."
-npx prisma db push
+npx prisma db push --accept-data-loss
 
 # (Optional) Seed the database here if you have a seed script
 # echo "Seeding database..."

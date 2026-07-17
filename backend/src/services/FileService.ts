@@ -118,7 +118,8 @@ export class FileService {
           userId,
           action: 'UPLOAD_FILE',
           entityType: 'FILE',
-          entityId: newFile.id
+          entityId: newFile.id,
+          entityName: newFile.originalName
         }
       });
 
@@ -131,7 +132,7 @@ export class FileService {
     }
   }
 
-  public async getDownloadStream(fileId: string, userId: string): Promise<{ stream: NodeJS.ReadableStream, filename: string, mimeType: string }> {
+  public async getDownloadStream(fileId: string, userId: string, options?: { start?: number; end?: number }): Promise<{ stream: NodeJS.ReadableStream, filename: string, mimeType: string }> {
     const file = await prisma.file.findUnique({
       where: { id: fileId },
       include: { physicalFile: true }
@@ -147,7 +148,7 @@ export class FileService {
         throw new AppError('Unauthorized access to file', 403);
     }
 
-    const stream = await this.storageService.download(file.physicalFile.storagePath);
+    const stream = await this.storageService.download(file.physicalFile.storagePath, options);
     return { stream, filename: file.originalName, mimeType: file.mimeType };
   }
 
@@ -192,7 +193,8 @@ export class FileService {
           userId,
           action: 'DELETE_FILE',
           entityType: 'FILE',
-          entityId: fileId
+          entityId: fileId,
+          entityName: file.originalName
         }
       });
     });

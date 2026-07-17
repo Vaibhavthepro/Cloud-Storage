@@ -25,6 +25,10 @@ model User {
   name           String
   email          String         @unique
   passwordHash   String
+  username       String?        @unique
+  bio            String?
+  resetPasswordToken   String?
+  resetPasswordExpires DateTime?
   role           Role           @default(USER)
   storageQuota   BigInt         @default(1073741824) // 1GB default
   storageUsed    BigInt         @default(0)
@@ -39,6 +43,7 @@ model User {
   sharedWithMe   UserShare[]       @relation("SharedWith")
   folderSharedByMe     UserFolderShare[] @relation("FolderSharedBy")
   folderSharedWithMe   UserFolderShare[] @relation("FolderSharedWith")
+  uploadSessions UploadSession[]
 }
 
 model Folder {
@@ -54,6 +59,7 @@ model Folder {
   
   files          File[]
   folderShares   UserFolderShare[]
+  uploadSessions UploadSession[]
 }
 
 model PhysicalStorage {
@@ -112,6 +118,7 @@ model ActivityLog {
   action         String         // e.g., UPLOAD, DOWNLOAD, DELETE
   entityType     String         // e.g., FILE, FOLDER, USER
   entityId       String?
+  entityName     String?
   ipAddress      String?
   timestamp      DateTime       @default(now())
 }
@@ -151,4 +158,35 @@ model UserFolderShare {
   createdAt      DateTime       @default(now())
 
   @@unique([folderId, sharedWithId])
+}
+
+model UploadSession {
+  id           String        @id @default(uuid())
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filename     String
+  mimeType     String
+  extension    String
+  size         BigInt
+  folderId     String?
+  folder       Folder?       @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  chunkSize    Int
+  totalChunks  Int
+  status       String        @default("PENDING") // PENDING, MERGING, COMPLETED, FAILED
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  chunks       UploadChunk[]
+}
+
+model UploadChunk {
+  id             String        @id @default(uuid())
+  sessionId      String
+  session        UploadSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  chunkIndex     Int
+  size           Int
+  checksum       String
+  isUploaded     Boolean       @default(false)
+  uploadedAt     DateTime?
+  
+  @@unique([sessionId, chunkIndex])
 }

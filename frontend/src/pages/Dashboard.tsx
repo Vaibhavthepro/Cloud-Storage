@@ -3,6 +3,9 @@ import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
 import { FileText, Folder as FolderIcon, Upload, Trash2, Download, Search, Share2 } from 'lucide-react';
+import { UploadManager } from '../components/UploadManager';
+import type { UploadItem } from '../components/UploadManager';
+import { ChunkUploader } from '../utils/uploadClient';
 
 interface FileItem {
   id: string;
@@ -18,7 +21,7 @@ interface FolderItem {
 }
 
 const Dashboard = () => {
-  const { token } = useContext(AuthContext);
+  const { token, refreshUser } = useContext(AuthContext);
   const queryParams = new URLSearchParams(window.location.search);
   const initialFolder = queryParams.get('folder');
 
@@ -28,6 +31,29 @@ const Dashboard = () => {
   const [currentFolder, setCurrentFolder] = useState<string | null>(initialFolder);
   const [searchQuery, setSearchQuery] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+
+  const [uploads, setUploads] = useState<UploadItem[]>([]);
+  const uploadersRef = useRef<{ [key: string]: ChunkUploader }>({});
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handlePauseUpload = (id: string) => {
+    uploadersRef.current[id]?.pause();
+  };
+
+  const handleResumeUpload = (id: string) => {
+    uploadersRef.current[id]?.resume();
+  };
+
+  const handleCancelUpload = (id: string) => {
+    uploadersRef.current[id]?.cancel();
+    delete uploadersRef.current[id];
+    setUploads((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleClearCompleted = () => {
+    setUploads((prev) => prev.filter((item) => item.status !== 'SUCCESS'));
+  };
 
   const fetchData = async () => {
     try {
@@ -75,27 +101,207 @@ const Dashboard = () => {
     fileInputRef.current?.click();
   };
 
+  const handleFolderUploadClick = () => {
+    folderInputRef.current?.click();
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    await uploadFilesAndFolders([{ file, folderPath: '' }]);
+  };
 
-    const formData = new FormData();
-    formData.append('file', file);
-    if (currentFolder) {
-      formData.append('folderId', currentFolder);
-    }
+  const handleFolderChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const filesList = e.target.files;
+    if (!filesList || filesList.length === 0) return;
+
+    const filesToUpload = Array.from(filesList).map((file) => {
+      const parts = file.webkitRelativePath.split('/');
+      parts.pop(); // Remove filename
+      const folderPath = parts.join('/');
+      return { file, folderPath };
+    });
+
+    await uploadFilesAndFolders(filesToUpload);
+  };
+
+  const uploadFilesAndFolders = async (filesList: { file: File; folderPath: string }[]) => {
+    // 1. Get all unique folder paths to create
+    const folderPathsSet = new Set<string>();
+    filesList.forEach(({ folderPath }) => {
+      if (folderPath) {
+        let currentPath = '';
+        folderPath.split('/').forEach((part, index) => {
+          currentPath = index === 0 ? part : `${currentPath}/${part}`;
+          folderPathsSet.add(currentPath);
+        });
+      }
+    });
+
+    // Sort by depth so parent folders are created first
+    const sortedFolderPaths = Array.from(folderPathsSet).sort((a, b) => {
+      return a.split('/').length - b.split('/').length;
+    });
+
+    // Create folders sequentially
+    const pathToFolderId: { [path: string]: string } = {};
 
     try {
-      await axios.post('/api/files/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${token}`
+      setLoading(true);
+      for (const relPath of sortedFolderPaths) {
+        const parts = relPath.split('/');
+        const folderName = parts[parts.length - 1];
+        
+        let parentFolderId: string | null = currentFolder;
+        if (parts.length > 1) {
+          const parentPath = parts.slice(0, -1).join('/');
+          parentFolderId = pathToFolderId[parentPath] || currentFolder;
         }
-      });
-      fetchData();
+
+        const res = await axios.post('/api/folders', {
+          name: folderName,
+          parentId: parentFolderId
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        pathToFolderId[relPath] = res.data.data.id;
+      }
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Error uploading file');
+      alert(error.response?.data?.message || 'Error creating folder structure');
+      fetchData();
+      return;
+    } finally {
+      setLoading(false);
     }
+
+    // 2. Start uploads
+    filesList.forEach(({ file, folderPath }) => {
+      const fileFolderId = folderPath ? (pathToFolderId[folderPath] || currentFolder) : currentFolder;
+      const uploadId = Math.random().toString(36).substring(2, 9);
+      
+      const nameToShow = folderPath ? `${folderPath}/${file.name}` : file.name;
+
+      const newItem: UploadItem = {
+        id: uploadId,
+        name: nameToShow,
+        size: file.size,
+        percentage: 0,
+        currentChunk: 0,
+        totalChunks: 0,
+        speed: 0,
+        eta: 0,
+        status: 'PENDING',
+      };
+
+      setUploads((prev) => [newItem, ...prev]);
+
+      const uploader = new ChunkUploader({
+        file,
+        token: token || '',
+        folderId: fileFolderId,
+        onProgress: (progress) => {
+          setUploads((prev) =>
+            prev.map((item) =>
+              item.id === uploadId
+                ? {
+                    ...item,
+                    percentage: progress.percentage,
+                    currentChunk: progress.currentChunk,
+                    totalChunks: progress.totalChunks,
+                    speed: progress.speed,
+                    eta: progress.eta,
+                    status: progress.status,
+                  }
+                : item
+            )
+          );
+        },
+        onSuccess: () => {
+          setUploads((prev) =>
+            prev.map((item) =>
+              item.id === uploadId ? { ...item, status: 'SUCCESS', percentage: 100 } : item
+            )
+          );
+          delete uploadersRef.current[uploadId];
+          fetchData();
+          refreshUser();
+        },
+        onError: (err) => {
+          setUploads((prev) =>
+            prev.map((item) =>
+              item.id === uploadId ? { ...item, status: 'FAILED', error: err } : item
+            )
+          );
+        },
+      });
+
+      uploadersRef.current[uploadId] = uploader;
+      uploader.start();
+    });
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    const items = e.dataTransfer.items;
+    if (!items) return;
+
+    const filesToUpload: { file: File; folderPath: string }[] = [];
+
+    const traverseEntry = async (entry: any, path: string = '') => {
+      if (entry.isFile) {
+        const file = await new Promise<File>((resolve, reject) => entry.file(resolve, reject));
+        filesToUpload.push({ file, folderPath: path });
+      } else if (entry.isDirectory) {
+        const dirReader = entry.createReader();
+        
+        const readAllEntries = async () => {
+          const allEntries: any[] = [];
+          const read = async () => {
+            const batch = await new Promise<any[]>((resolve, reject) => dirReader.readEntries(resolve, reject));
+            if (batch.length > 0) {
+              allEntries.push(...batch);
+              await read();
+            }
+          };
+          await read();
+          return allEntries;
+        };
+
+        const entries = await readAllEntries();
+        const newPath = path ? `${path}/${entry.name}` : entry.name;
+        for (const childEntry of entries) {
+          await traverseEntry(childEntry, newPath);
+        }
+      }
+    };
+
+    const promises: Promise<void>[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.kind === 'file') {
+        const entry = item.webkitGetAsEntry();
+        if (entry) {
+          promises.push(traverseEntry(entry));
+        }
+      }
+    }
+
+    await Promise.all(promises);
+
+    if (filesToUpload.length === 0) return;
+    await uploadFilesAndFolders(filesToUpload);
   };
 
   const handleDelete = async (id: string, type: 'file' | 'folder') => {
@@ -105,6 +311,7 @@ const Dashboard = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchData();
+      refreshUser();
     } catch (error) {
       console.error('Error deleting', error);
     }
@@ -215,7 +422,11 @@ const Dashboard = () => {
               <FolderIcon size={18} />
               New Folder
             </button>
-            <button className="btn btn-primary" onClick={handleUploadClick}>
+            <button className="btn btn-secondary" onClick={handleFolderUploadClick} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Upload size={18} />
+              Upload Folder
+            </button>
+            <button className="btn btn-primary" onClick={handleUploadClick} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Upload size={18} />
               Upload File
             </button>
@@ -226,13 +437,52 @@ const Dashboard = () => {
               onChange={handleFileChange}
               accept="*/*"
             />
+            <input 
+              type="file" 
+              ref={folderInputRef} 
+              style={{ display: 'none' }} 
+              onChange={handleFolderChange}
+              {...({ webkitdirectory: "", directory: "", multiple: true } as any)}
+            />
           </div>
         </div>
 
         {loading ? (
           <div>Loading...</div>
         ) : (
-          <div className="glass-panel" style={{ padding: '1.5rem', flex: 1 }}>
+          <div 
+            className="glass-panel" 
+            style={{ 
+              padding: '1.5rem', 
+              flex: 1,
+              border: isDragging ? '2px dashed var(--primary)' : '1px solid var(--border-color)',
+              transition: 'all 0.2s ease',
+              position: 'relative'
+            }}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            {isDragging && (
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(15, 23, 42, 0.85)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10,
+                borderRadius: '8px',
+                pointerEvents: 'none'
+              }}>
+                <Upload size={48} style={{ color: 'var(--primary)', marginBottom: '1rem' }} />
+                <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>Drop files or folders here to upload</span>
+              </div>
+            )}
             
             {folders.length > 0 && (
               <>
@@ -295,6 +545,13 @@ const Dashboard = () => {
           </div>
         )}
       </div>
+      <UploadManager
+        uploads={uploads}
+        onPause={handlePauseUpload}
+        onResume={handleResumeUpload}
+        onCancel={handleCancelUpload}
+        onClearCompleted={handleClearCompleted}
+      />
     </div>
   );
 };
