@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext, useRef } from 'react';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
-import { FileText, Folder as FolderIcon, Upload, Trash2, Download, Search, Share2 } from 'lucide-react';
+import { FileText, Folder as FolderIcon, Upload, Trash2, Download, Search, Share2, MoreHorizontal, Image as ImageIcon, FileArchive as FileArchiveIcon, Database as DatabaseIcon, Code as CodeIcon } from 'lucide-react';
 import { UploadManager } from '../components/UploadManager';
 import type { UploadItem } from '../components/UploadManager';
 import { ChunkUploader } from '../utils/uploadClient';
@@ -20,6 +20,59 @@ interface FolderItem {
   updatedAt: string;
 }
 
+interface ImagePreviewProps {
+  fileId: string;
+  token: string;
+  alt: string;
+}
+
+const ImagePreview: React.FC<ImagePreviewProps> = ({ fileId, token, alt }) => {
+  const [src, setSrc] = useState<string>('');
+
+  useEffect(() => {
+    let objectUrl = '';
+    const fetchImage = async () => {
+      try {
+        const res = await axios.get(`/api/files/${fileId}/download`, {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: 'blob'
+        });
+        objectUrl = window.URL.createObjectURL(res.data);
+        setSrc(objectUrl);
+      } catch (err) {
+        console.error("Failed to load image preview", err);
+      }
+    };
+
+    fetchImage();
+
+    return () => {
+      if (objectUrl) window.URL.revokeObjectURL(objectUrl);
+    };
+  }, [fileId, token]);
+
+  if (!src) {
+    return (
+      <div style={{ 
+        width: '100%', 
+        height: '150px', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        background: 'rgba(255,255,255,0.03)', 
+        borderRadius: '12px',
+        border: '1px solid rgba(255,255,255,0.05)',
+        fontSize: '0.8rem',
+        color: 'var(--text-muted)'
+      }}>
+        Loading preview...
+      </div>
+    );
+  }
+
+  return <img src={src} alt={alt} style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '12px' }} />;
+};
+
 const Dashboard = () => {
   const { token, refreshUser } = useContext(AuthContext);
   const queryParams = new URLSearchParams(window.location.search);
@@ -36,6 +89,113 @@ const Dashboard = () => {
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const uploadersRef = useRef<{ [key: string]: ChunkUploader }>({});
   const [isDragging, setIsDragging] = useState(false);
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+
+  const toggleMenu = (id: string) => {
+    setActiveMenuId((prev) => (prev === id ? null : id));
+  };
+
+  useEffect(() => {
+    const handleOutsideClick = () => {
+      setActiveMenuId(null);
+    };
+    window.addEventListener('click', handleOutsideClick);
+    return () => window.removeEventListener('click', handleOutsideClick);
+  }, []);
+
+  const getFolderColor = (index: number) => {
+    const colors = ['#3b82f6', '#a855f7', '#06b6d4', '#10b981', '#6366f1'];
+    return colors[index % colors.length];
+  };
+
+  const isImageFile = (file: FileItem) => {
+    const ext = file.originalName.split('.').pop()?.toLowerCase();
+    return ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext || '');
+  };
+
+  const getFileIcon = (file: FileItem) => {
+    const ext = file.originalName.split('.').pop()?.toLowerCase();
+    
+    // PDF
+    if (ext === 'pdf') {
+      return (
+        <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <FileText size={22} style={{ color: '#ef4444' }} />
+        </div>
+      );
+    }
+    // Figma
+    if (ext === 'fig') {
+      return (
+        <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(242, 78, 30, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <FileText size={22} style={{ color: '#f24e1e' }} />
+        </div>
+      );
+    }
+    // SQL / Database
+    if (ext === 'sql' || ext === 'db') {
+      return (
+        <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <DatabaseIcon size={22} style={{ color: '#3b82f6' }} />
+        </div>
+      );
+    }
+    // Code / Script
+    const codeExts = ['js', 'ts', 'tsx', 'jsx', 'html', 'css', 'py', 'java', 'cpp', 'c', 'json', 'sh'];
+    if (codeExts.includes(ext || '')) {
+      return (
+        <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(99, 102, 241, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <CodeIcon size={22} style={{ color: '#6366f1' }} />
+        </div>
+      );
+    }
+    // Image
+    const imgExts = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'];
+    if (imgExts.includes(ext || '')) {
+      return (
+        <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <ImageIcon size={22} style={{ color: '#10b981' }} />
+        </div>
+      );
+    }
+    // Zip / Archive
+    const zipExts = ['zip', 'rar', 'tar', 'gz', '7z'];
+    if (zipExts.includes(ext || '')) {
+      return (
+        <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(245, 158, 11, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <FileArchiveIcon size={22} style={{ color: '#f59e0b' }} />
+        </div>
+      );
+    }
+    
+    // Default
+    return (
+      <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <FileText size={22} style={{ color: 'var(--text-muted)' }} />
+      </div>
+    );
+  };
+
+  const getLargeFileIcon = (file: FileItem) => {
+    const ext = file.originalName.split('.').pop()?.toLowerCase();
+    if (ext === 'pdf') return <FileText size={32} style={{ color: '#ef4444' }} />;
+    if (ext === 'fig') return <FileText size={32} style={{ color: '#f24e1e' }} />;
+    if (ext === 'sql' || ext === 'db') return <DatabaseIcon size={32} style={{ color: '#3b82f6' }} />;
+    return <CodeIcon size={32} style={{ color: '#3b82f6' }} />;
+  };
+
+  const getFileTypeLabel = (file: FileItem) => {
+    const ext = file.originalName.split('.').pop()?.toLowerCase();
+    if (!ext) return 'File';
+    if (ext === 'pdf') return 'PDF';
+    if (ext === 'fig') return 'Fig';
+    if (ext === 'sql') return 'Database';
+    if (ext === 'db') return 'Database';
+    if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) return 'Image';
+    if (['zip', 'rar', 'tar'].includes(ext)) return 'Archive';
+    if (['js', 'ts', 'tsx', 'jsx', 'html', 'css', 'py'].includes(ext)) return 'Code';
+    return ext.toUpperCase();
+  };
 
   const handlePauseUpload = (id: string) => {
     uploadersRef.current[id]?.pause();
@@ -383,14 +543,16 @@ const Dashboard = () => {
     }
   };
 
-  const formatSize = (bytesStr: string) => {
-    const bytes = parseInt(bytesStr);
-    if (bytes === 0) return '0 B';
+  const formatSize = (bytesStr: string | number) => {
+    const bytes = typeof bytesStr === 'string' ? parseInt(bytesStr, 10) : bytesStr;
+    if (!bytes || bytes === 0) return '0 B';
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
+
+  const remainingFiles = files.slice(2);
 
   return (
     <div className="app-container">
@@ -484,26 +646,65 @@ const Dashboard = () => {
               </div>
             )}
             
-            {folders.length > 0 && (
+            {/* Top section: Featured Files (Large Cards, first 2 files) */}
+            {files.length > 0 && (
               <>
-                <h3 style={{ marginBottom: '1rem' }}>Folders</h3>
-                <div className="file-grid" style={{ marginBottom: '2rem' }}>
-                  {folders.map(folder => (
-                    <div key={folder.id} className="file-card glass-panel" style={{ padding: '1rem', flexDirection: 'row', justifyContent: 'space-between', cursor: 'pointer' }} onClick={() => setCurrentFolder(folder.id)}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <FolderIcon size={24} style={{ color: 'var(--primary)' }} />
-                        <span style={{ fontWeight: 500 }}>{folder.name}</span>
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button className="btn-ghost" style={{ padding: '0.25rem', border: 'none', cursor: 'pointer', color: 'var(--success)' }} onClick={(e) => { e.stopPropagation(); handleDownloadFolder(folder.id, folder.name); }} title="Download Folder as ZIP">
-                          <Download size={16} />
-                        </button>
-                        <button className="btn-ghost" style={{ padding: '0.25rem', border: 'none', cursor: 'pointer', color: 'var(--secondary)' }} onClick={(e) => { e.stopPropagation(); handleShareFolder(folder.id); }} title="Share Folder">
-                          <Share2 size={16} />
-                        </button>
-                        <button className="btn-ghost" style={{ padding: '0.25rem', border: 'none', cursor: 'pointer', color: 'var(--danger)' }} onClick={(e) => { e.stopPropagation(); handleDelete(folder.id, 'folder'); }} title="Delete Folder">
-                          <Trash2 size={16} />
-                        </button>
+                <h3 style={{ marginBottom: '1.25rem', fontSize: '1.2rem', textAlign: 'left' }}>Featured Files</h3>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                  gap: '1.5rem',
+                  marginBottom: '2.5rem'
+                }}>
+                  {files.slice(0, 2).map((file) => (
+                    <div 
+                      key={file.id} 
+                      className="glass-panel" 
+                      style={{ 
+                        padding: '1.25rem', 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: '1rem',
+                        borderRadius: '20px',
+                        cursor: 'pointer',
+                        textAlign: 'left'
+                      }}
+                    >
+                      {/* Top half: preview */}
+                      {isImageFile(file) ? (
+                        <ImagePreview fileId={file.id} token={token || ''} alt={file.originalName} />
+                      ) : (
+                        <div style={{ width: '100%', height: '150px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <div style={{ width: '64px', height: '64px', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.3)', background: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {getLargeFileIcon(file)}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Bottom half: name, size, time, and action buttons */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', position: 'relative' }}>
+                        <span className="file-name" title={file.originalName} style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-main)', display: 'block', maxWidth: '80%' }}>
+                          {file.originalName}
+                        </span>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          {formatSize(file.size)}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
+                          Today, 10:34 AM
+                        </span>
+                        
+                        {/* Action buttons on bottom right */}
+                        <div style={{ display: 'flex', gap: '0.5rem', position: 'absolute', right: 0, bottom: 0 }}>
+                          <button className="btn-ghost" style={{ padding: '0.4rem', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }} onClick={() => handleDownload(file.id, file.originalName)} title="Download">
+                            <Download size={14} />
+                          </button>
+                          <button className="btn-ghost" style={{ padding: '0.4rem', border: '1px solid rgba(99, 102, 241, 0.2)', cursor: 'pointer', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '8px', color: 'var(--secondary)', display: 'flex', alignItems: 'center' }} onClick={() => handleShare(file.id)} title="Share">
+                            <Share2 size={14} />
+                          </button>
+                          <button className="btn-ghost" style={{ padding: '0.4rem', border: '1px solid rgba(239, 68, 68, 0.2)', cursor: 'pointer', background: 'rgba(239, 68, 68, 0.05)', borderRadius: '8px', color: 'var(--danger)', display: 'flex', alignItems: 'center' }} onClick={() => handleDelete(file.id, 'file')} title="Delete">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -511,31 +712,144 @@ const Dashboard = () => {
               </>
             )}
 
-            <h3 style={{ marginBottom: '1rem' }}>Files</h3>
-            {files.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-                <FileText size={48} style={{ opacity: 0.5, margin: '0 auto 1rem' }} />
-                <p>No files found. Upload something to get started!</p>
-              </div>
-            ) : (
-              <div className="file-grid">
-                {files.map(file => (
-                  <div key={file.id} className="file-card glass-panel">
-                    <FileText className="file-icon" />
-                    <div className="file-name" title={file.originalName}>{file.originalName}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-                      {formatSize(file.size)}
+            {/* Folders Section */}
+            {folders.length > 0 && (
+              <>
+                <h3 style={{ marginBottom: '1.25rem', fontSize: '1.2rem', textAlign: 'left' }}>Folders</h3>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                  gap: '1.5rem',
+                  marginBottom: '2.5rem'
+                }}>
+                  {folders.map((folder, index) => (
+                    <div 
+                      key={folder.id} 
+                      className="glass-panel" 
+                      style={{ 
+                        padding: '1.25rem', 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        justifyContent: 'space-between', 
+                        cursor: 'pointer',
+                        position: 'relative',
+                        borderRadius: '16px',
+                        minHeight: '120px'
+                      }} 
+                      onClick={() => setCurrentFolder(folder.id)}
+                    >
+                      {/* Top section: folder icon and 3 dots menu */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                        <FolderIcon size={32} style={{ color: getFolderColor(index) }} />
+                        <div style={{ position: 'relative' }}>
+                          <button 
+                            className="btn-ghost" 
+                            style={{ padding: '0.25rem', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }} 
+                            onClick={(e) => { e.stopPropagation(); toggleMenu(folder.id); }}
+                          >
+                            <MoreHorizontal size={18} />
+                          </button>
+                          
+                          {activeMenuId === folder.id && (
+                            <div className="glass-panel dropdown-menu" onClick={(e) => e.stopPropagation()}>
+                              <button onClick={(e) => { e.stopPropagation(); setActiveMenuId(null); handleDownloadFolder(folder.id, folder.name); }}>
+                                <Download size={14} /> Download ZIP
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); setActiveMenuId(null); handleShareFolder(folder.id); }}>
+                                <Share2 size={14} /> Share Folder
+                              </button>
+                              <button style={{ color: 'var(--danger)' }} onClick={(e) => { e.stopPropagation(); setActiveMenuId(null); handleDelete(folder.id, 'folder'); }}>
+                                <Trash2 size={14} /> Delete
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Bottom section: text details */}
+                      <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '2px', textAlign: 'left' }}>
+                        <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{folder.name}</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Folder</span>
+                        <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
+                          {new Date(folder.updatedAt).toLocaleDateString()}
+                        </span>
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', width: '100%', justifyContent: 'center' }}>
-                      <button className="btn-ghost" style={{ padding: '0.5rem', border: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }} onClick={() => handleDownload(file.id, file.originalName)} title="Download">
-                        <Download size={16} />
-                      </button>
-                      <button className="btn-ghost" style={{ padding: '0.5rem', border: 'none', cursor: 'pointer', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--secondary)', borderRadius: '4px' }} onClick={() => handleShare(file.id)} title="Share">
-                        <Share2 size={16} />
-                      </button>
-                      <button className="btn-ghost" style={{ padding: '0.5rem', border: 'none', cursor: 'pointer', background: 'rgba(239,68,68,0.1)', color: 'var(--danger)', borderRadius: '4px' }} onClick={() => handleDelete(file.id, 'file')} title="Delete">
-                        <Trash2 size={16} />
-                      </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Remaining Files Section (index >= 2) */}
+            <h3 style={{ marginBottom: '1.25rem', fontSize: '1.2rem', textAlign: 'left' }}>All Files</h3>
+            {files.length <= 2 && remainingFiles.length === 0 ? (
+              files.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                  <FileText size={48} style={{ opacity: 0.5, margin: '0 auto 1rem' }} />
+                  <p>No files found. Upload something to get started!</p>
+                </div>
+              )
+            ) : (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+                gap: '1.5rem'
+              }}>
+                {remainingFiles.map((file) => (
+                  <div 
+                    key={file.id} 
+                    className="glass-panel" 
+                    style={{ 
+                      padding: '1.25rem', 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      justifyContent: 'space-between', 
+                      position: 'relative',
+                      borderRadius: '16px',
+                      minHeight: '120px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {/* Top section: file icon and 3 dots menu */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                      {getFileIcon(file)}
+                      <div style={{ position: 'relative' }}>
+                        <button 
+                          className="btn-ghost" 
+                          style={{ padding: '0.25rem', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }} 
+                          onClick={(e) => { e.stopPropagation(); toggleMenu(file.id); }}
+                        >
+                          <MoreHorizontal size={18} />
+                        </button>
+                        
+                        {activeMenuId === file.id && (
+                          <div className="glass-panel dropdown-menu" onClick={(e) => e.stopPropagation()}>
+                            <button onClick={(e) => { e.stopPropagation(); setActiveMenuId(null); handleDownload(file.id, file.originalName); }}>
+                              <Download size={14} /> Download
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); setActiveMenuId(null); handleShare(file.id); }}>
+                              <Share2 size={14} /> Share
+                            </button>
+                            <button style={{ color: 'var(--danger)' }} onClick={(e) => { e.stopPropagation(); setActiveMenuId(null); handleDelete(file.id, 'file'); }}>
+                              <Trash2 size={14} /> Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Bottom section: text details */}
+                    <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '2px', textAlign: 'left' }}>
+                      <span className="file-name" title={file.originalName} style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {file.originalName}
+                      </span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        {getFileTypeLabel(file)}
+                      </span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
+                        <span>{formatSize(file.size)}</span>
+                        <span>{new Date(file.updatedAt).toLocaleDateString()}</span>
+                      </div>
                     </div>
                   </div>
                 ))}
