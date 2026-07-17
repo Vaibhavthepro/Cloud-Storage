@@ -285,3 +285,49 @@ export const deleteFile = async (req: Request | any, res: Response, next: NextFu
     next(error);
   }
 };
+
+export const toggleStarFile = async (req: Request | any, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const file = await prisma.file.findUnique({
+      where: { id }
+    });
+
+    if (!file) {
+      return next(new AppError('File not found', 404));
+    }
+
+    if (file.ownerId !== userId) {
+      return next(new AppError('Unauthorized', 403));
+    }
+
+    const updatedFile = await prisma.file.update({
+      where: { id },
+      data: { starred: !file.starred }
+    });
+
+    await prisma.activityLog.create({
+      data: {
+        userId,
+        action: updatedFile.starred ? 'STAR_FILE' : 'UNSTAR_FILE',
+        entityType: 'FILE',
+        entityId: id,
+        entityName: file.originalName,
+        ipAddress: req.ip || req.connection.remoteAddress
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: updatedFile.starred ? 'File starred' : 'File unstarred',
+      data: {
+        ...updatedFile,
+        size: updatedFile.size.toString()
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};

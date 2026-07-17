@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext, useRef } from 'react';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
-import { FileText, Folder as FolderIcon, Upload, Trash2, Download, Search, Share2, MoreHorizontal, Image as ImageIcon, FileArchive as FileArchiveIcon, Database as DatabaseIcon, Code as CodeIcon } from 'lucide-react';
+import { FileText, Folder as FolderIcon, Upload, Trash2, Download, Search, Share2, MoreHorizontal, Image as ImageIcon, FileArchive as FileArchiveIcon, Database as DatabaseIcon, Code as CodeIcon, Star } from 'lucide-react';
 import { UploadManager } from '../components/UploadManager';
 import type { UploadItem } from '../components/UploadManager';
 import { ChunkUploader } from '../utils/uploadClient';
@@ -12,12 +12,14 @@ interface FileItem {
   originalName: string;
   size: string;
   updatedAt: string;
+  starred: boolean;
 }
 
 interface FolderItem {
   id: string;
   name: string;
   updatedAt: string;
+  starred: boolean;
 }
 
 interface ImagePreviewProps {
@@ -528,6 +530,28 @@ const Dashboard = () => {
     }
   };
 
+  const handleToggleStarFile = async (id: string) => {
+    try {
+      await axios.patch(`/api/files/${id}/star`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchData();
+    } catch (error) {
+      console.error('Error starring file', error);
+    }
+  };
+
+  const handleToggleStarFolder = async (id: string) => {
+    try {
+      await axios.patch(`/api/folders/${id}/star`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchData();
+    } catch (error) {
+      console.error('Error starring folder', error);
+    }
+  };
+
   const handleDownload = async (id: string, filename: string) => {
     try {
       const res = await axios.get(`/api/files/${id}/download`, {
@@ -602,6 +626,9 @@ const Dashboard = () => {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
+
+  const starredFiles = files.filter((f) => f.starred);
+  const starredFolders = folders.filter((f) => f.starred);
 
   return (
     <div className="app-container">
@@ -695,19 +722,71 @@ const Dashboard = () => {
               </div>
             )}
             
-            {/* Top section: Featured Files (Large Cards, first 2 files) */}
-            {files.length > 0 && (
+            {/* Top section: Starred / Featured Items Section */}
+            {(starredFiles.length > 0 || starredFolders.length > 0) && (
               <>
-                <h3 style={{ marginBottom: '1.25rem', fontSize: '1.2rem', textAlign: 'left' }}>Featured Files</h3>
+                <h3 style={{ marginBottom: '1.25rem', fontSize: '1.2rem', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Star size={20} fill="#eab308" color="#eab308" /> Starred Items
+                </h3>
                 <div style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                   gap: '1.5rem',
                   marginBottom: '2.5rem'
                 }}>
-                  {files.slice(0, 2).map((file) => (
+                  {/* Starred Folders */}
+                  {starredFolders.map((folder, index) => (
                     <div 
-                      key={file.id} 
+                      key={`starred-folder-${folder.id}`} 
+                      className="glass-panel" 
+                      style={{ 
+                        padding: '1.25rem', 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        justifyContent: 'space-between', 
+                        cursor: 'pointer',
+                        position: 'relative',
+                        borderRadius: '16px',
+                        minHeight: '120px',
+                        border: '1px solid rgba(234, 179, 8, 0.3)'
+                      }} 
+                      onClick={() => setCurrentFolder(folder.id)}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                        <FolderIcon size={32} style={{ color: getFolderColor(index) }} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <button 
+                            className="btn-ghost" 
+                            style={{ padding: '0.25rem', border: 'none', background: 'transparent', cursor: 'pointer' }}
+                            onClick={(e) => { e.stopPropagation(); handleToggleStarFolder(folder.id); }}
+                            title="Unstar Folder"
+                          >
+                            <Star size={16} fill="#eab308" color="#eab308" />
+                          </button>
+                          <button 
+                            className="btn-ghost" 
+                            style={{ padding: '0.25rem', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }} 
+                            onClick={(e) => { e.stopPropagation(); toggleMenu(folder.id); }}
+                          >
+                            <MoreHorizontal size={18} />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '2px', textAlign: 'left' }}>
+                        <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{folder.name}</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Folder</span>
+                        <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
+                          {new Date(folder.updatedAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Starred Files */}
+                  {starredFiles.map((file) => (
+                    <div 
+                      key={`starred-file-${file.id}`} 
                       className="glass-panel" 
                       style={{ 
                         padding: '1.25rem', 
@@ -716,7 +795,8 @@ const Dashboard = () => {
                         gap: '1rem',
                         borderRadius: '20px',
                         cursor: 'pointer',
-                        textAlign: 'left'
+                        textAlign: 'left',
+                        border: '1px solid rgba(234, 179, 8, 0.3)'
                       }}
                     >
                       {/* Top half: preview */}
@@ -732,7 +812,7 @@ const Dashboard = () => {
                       
                       {/* Bottom half: name, size, time, and action buttons */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', position: 'relative' }}>
-                        <span className="file-name" title={file.originalName} style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-main)', display: 'block', maxWidth: '80%' }}>
+                        <span className="file-name" title={file.originalName} style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-main)', display: 'block', maxWidth: '75%' }}>
                           {file.originalName}
                         </span>
                         <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
@@ -743,14 +823,17 @@ const Dashboard = () => {
                         </span>
                         
                         {/* Action buttons on bottom right */}
-                        <div style={{ display: 'flex', gap: '0.5rem', position: 'absolute', right: 0, bottom: 0 }}>
-                          <button className="btn-ghost" style={{ padding: '0.4rem', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }} onClick={() => handleDownload(file.id, file.originalName)} title="Download">
+                        <div style={{ display: 'flex', gap: '0.4rem', position: 'absolute', right: 0, bottom: 0 }}>
+                          <button className="btn-ghost" style={{ padding: '0.35rem', border: '1px solid rgba(234, 179, 8, 0.3)', cursor: 'pointer', background: 'rgba(234, 179, 8, 0.05)', borderRadius: '8px', color: '#eab308', display: 'flex', alignItems: 'center' }} onClick={() => handleToggleStarFile(file.id)} title="Unstar File">
+                            <Star size={14} fill="#eab308" color="#eab308" />
+                          </button>
+                          <button className="btn-ghost" style={{ padding: '0.35rem', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }} onClick={() => handleDownload(file.id, file.originalName)} title="Download">
                             <Download size={14} />
                           </button>
-                          <button className="btn-ghost" style={{ padding: '0.4rem', border: '1px solid rgba(99, 102, 241, 0.2)', cursor: 'pointer', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '8px', color: 'var(--secondary)', display: 'flex', alignItems: 'center' }} onClick={() => handleShare(file.id)} title="Share">
+                          <button className="btn-ghost" style={{ padding: '0.35rem', border: '1px solid rgba(99, 102, 241, 0.2)', cursor: 'pointer', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '8px', color: 'var(--secondary)', display: 'flex', alignItems: 'center' }} onClick={() => handleShare(file.id)} title="Share">
                             <Share2 size={14} />
                           </button>
-                          <button className="btn-ghost" style={{ padding: '0.4rem', border: '1px solid rgba(239, 68, 68, 0.2)', cursor: 'pointer', background: 'rgba(239, 68, 68, 0.05)', borderRadius: '8px', color: 'var(--danger)', display: 'flex', alignItems: 'center' }} onClick={() => handleDelete(file.id, 'file')} title="Delete">
+                          <button className="btn-ghost" style={{ padding: '0.35rem', border: '1px solid rgba(239, 68, 68, 0.2)', cursor: 'pointer', background: 'rgba(239, 68, 68, 0.05)', borderRadius: '8px', color: 'var(--danger)', display: 'flex', alignItems: 'center' }} onClick={() => handleDelete(file.id, 'file')} title="Delete">
                             <Trash2 size={14} />
                           </button>
                         </div>
@@ -790,7 +873,15 @@ const Dashboard = () => {
                       {/* Top section: folder icon and 3 dots menu */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                         <FolderIcon size={32} style={{ color: getFolderColor(index) }} />
-                        <div style={{ position: 'relative' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', position: 'relative' }}>
+                          <button 
+                            className="btn-ghost" 
+                            style={{ padding: '0.25rem', border: 'none', background: 'transparent', cursor: 'pointer' }}
+                            onClick={(e) => { e.stopPropagation(); handleToggleStarFolder(folder.id); }}
+                            title={folder.starred ? "Unstar Folder" : "Star Folder"}
+                          >
+                            <Star size={16} fill={folder.starred ? "#eab308" : "none"} color={folder.starred ? "#eab308" : "var(--text-muted)"} />
+                          </button>
                           <button 
                             className="btn-ghost" 
                             style={{ padding: '0.25rem', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }} 
@@ -801,6 +892,9 @@ const Dashboard = () => {
                           
                           {activeMenuId === folder.id && (
                             <div className="glass-panel dropdown-menu" onClick={(e) => e.stopPropagation()}>
+                              <button onClick={(e) => { e.stopPropagation(); setActiveMenuId(null); handleToggleStarFolder(folder.id); }}>
+                                <Star size={14} fill={folder.starred ? "#eab308" : "none"} color={folder.starred ? "#eab308" : "currentColor"} /> {folder.starred ? 'Unstar Folder' : 'Star Folder'}
+                              </button>
                               <button onClick={(e) => { e.stopPropagation(); setActiveMenuId(null); handleDownloadFolder(folder.id, folder.name); }}>
                                 <Download size={14} /> Download ZIP
                               </button>
@@ -860,7 +954,15 @@ const Dashboard = () => {
                     {/* Top section: file icon and 3 dots menu */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                       {getFileIcon(file)}
-                      <div style={{ position: 'relative' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', position: 'relative' }}>
+                        <button 
+                          className="btn-ghost" 
+                          style={{ padding: '0.25rem', border: 'none', background: 'transparent', cursor: 'pointer' }}
+                          onClick={(e) => { e.stopPropagation(); handleToggleStarFile(file.id); }}
+                          title={file.starred ? "Unstar File" : "Star File"}
+                        >
+                          <Star size={16} fill={file.starred ? "#eab308" : "none"} color={file.starred ? "#eab308" : "var(--text-muted)"} />
+                        </button>
                         <button 
                           className="btn-ghost" 
                           style={{ padding: '0.25rem', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }} 
@@ -871,6 +973,9 @@ const Dashboard = () => {
                         
                         {activeMenuId === file.id && (
                           <div className="glass-panel dropdown-menu" onClick={(e) => e.stopPropagation()}>
+                            <button onClick={(e) => { e.stopPropagation(); setActiveMenuId(null); handleToggleStarFile(file.id); }}>
+                              <Star size={14} fill={file.starred ? "#eab308" : "none"} color={file.starred ? "#eab308" : "currentColor"} /> {file.starred ? 'Unstar File' : 'Star File'}
+                            </button>
                             <button onClick={(e) => { e.stopPropagation(); setActiveMenuId(null); handleDownload(file.id, file.originalName); }}>
                               <Download size={14} /> Download
                             </button>

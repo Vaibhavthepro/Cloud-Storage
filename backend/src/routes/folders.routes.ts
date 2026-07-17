@@ -197,6 +197,49 @@ export const downloadFolder = async (req: Request | any, res: Response, next: Ne
   }
 };
 
+export const toggleStarFolder = async (req: Request | any, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const folder = await prisma.folder.findUnique({
+      where: { id }
+    });
+
+    if (!folder) {
+      return next(new AppError('Folder not found', 404));
+    }
+
+    if (folder.ownerId !== userId) {
+      return next(new AppError('Unauthorized', 403));
+    }
+
+    const updatedFolder = await prisma.folder.update({
+      where: { id },
+      data: { starred: !folder.starred }
+    });
+
+    await prisma.activityLog.create({
+      data: {
+        userId,
+        action: updatedFolder.starred ? 'STAR_FOLDER' : 'UNSTAR_FOLDER',
+        entityType: 'FOLDER',
+        entityId: id,
+        entityName: folder.name,
+        ipAddress: req.ip || req.connection.remoteAddress
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: updatedFolder.starred ? 'Folder starred' : 'Folder unstarred',
+      data: updatedFolder
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const router = Router();
 router.use(authenticate);
 
@@ -204,5 +247,6 @@ router.post('/', createFolder);
 router.get('/', getFolders);
 router.get('/:id/download', downloadFolder);
 router.delete('/:id', deleteFolder);
+router.patch('/:id/star', toggleStarFolder);
 
 export default router;

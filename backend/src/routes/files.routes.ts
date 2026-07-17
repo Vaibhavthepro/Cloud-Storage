@@ -10,7 +10,8 @@ import {
   getChunkUploadStatus,
   uploadChunk,
   completeChunkUpload,
-  cancelChunkUpload
+  cancelChunkUpload,
+  toggleStarFile
 } from '../controllers/files.controller';
 import { authenticate } from '../middleware/auth.middleware';
 
@@ -32,5 +33,6 @@ router.post('/upload/cancel', cancelChunkUpload);
 router.get('/', getFiles);
 router.get('/:id/download', downloadFile);
 router.delete('/:id', deleteFile);
+router.patch('/:id/star', toggleStarFile);
 
 export default router;

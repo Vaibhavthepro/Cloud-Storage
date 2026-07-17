@@ -60,6 +60,7 @@ model Folder {
   files          File[]
   folderShares   UserFolderShare[]
   uploadSessions UploadSession[]
+  starred        Boolean           @default(false)
 }
 
 model PhysicalStorage {
@@ -96,6 +97,7 @@ model File {
   shares         Share[]
   virusLogs      VirusLog[]
   userShares     UserShare[]
+  starred        Boolean         @default(false)
 }
 
 model Share {
