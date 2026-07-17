@@ -184,6 +184,57 @@ const Dashboard = () => {
     return <CodeIcon size={32} style={{ color: '#3b82f6' }} />;
   };
 
+  const getLargeFileIconContainerStyle = (file: FileItem) => {
+    const ext = file.originalName.split('.').pop()?.toLowerCase();
+    if (ext === 'pdf') {
+      return {
+        width: '64px',
+        height: '64px',
+        borderRadius: '12px',
+        border: '1px solid rgba(239, 68, 68, 0.3)',
+        background: 'rgba(239, 68, 68, 0.1)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      };
+    }
+    if (ext === 'fig') {
+      return {
+        width: '64px',
+        height: '64px',
+        borderRadius: '12px',
+        border: '1px solid rgba(242, 78, 30, 0.3)',
+        background: 'rgba(242, 78, 30, 0.1)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      };
+    }
+    if (ext === 'sql' || ext === 'db') {
+      return {
+        width: '64px',
+        height: '64px',
+        borderRadius: '12px',
+        border: '1px solid rgba(59, 130, 246, 0.3)',
+        background: 'rgba(59, 130, 246, 0.1)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      };
+    }
+    // Code / Default
+    return {
+      width: '64px',
+      height: '64px',
+      borderRadius: '12px',
+      border: '1px solid rgba(99, 102, 241, 0.3)',
+      background: 'rgba(99, 102, 241, 0.1)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    };
+  };
+
   const getFileTypeLabel = (file: FileItem) => {
     const ext = file.originalName.split('.').pop()?.toLowerCase();
     if (!ext) return 'File';
@@ -552,8 +603,6 @@ const Dashboard = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const remainingFiles = files.slice(2);
-
   return (
     <div className="app-container">
       <Sidebar />
@@ -675,7 +724,7 @@ const Dashboard = () => {
                         <ImagePreview fileId={file.id} token={token || ''} alt={file.originalName} />
                       ) : (
                         <div style={{ width: '100%', height: '150px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.05)' }}>
-                          <div style={{ width: '64px', height: '64px', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.3)', background: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <div style={getLargeFileIconContainerStyle(file)}>
                             {getLargeFileIcon(file)}
                           </div>
                         </div>
@@ -780,22 +829,20 @@ const Dashboard = () => {
               </>
             )}
 
-            {/* Remaining Files Section (index >= 2) */}
+            {/* All Files Section */}
             <h3 style={{ marginBottom: '1.25rem', fontSize: '1.2rem', textAlign: 'left' }}>All Files</h3>
-            {files.length <= 2 && remainingFiles.length === 0 ? (
-              files.length === 0 && (
-                <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-                  <FileText size={48} style={{ opacity: 0.5, margin: '0 auto 1rem' }} />
-                  <p>No files found. Upload something to get started!</p>
-                </div>
-              )
+            {files.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                <FileText size={48} style={{ opacity: 0.5, margin: '0 auto 1rem' }} />
+                <p>No files found. Upload something to get started!</p>
+              </div>
             ) : (
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
                 gap: '1.5rem'
               }}>
-                {remainingFiles.map((file) => (
+                {files.map((file) => (
                   <div 
                     key={file.id} 
                     className="glass-panel" 
