@@ -30,10 +30,7 @@ services:
     plan: free
     envVars:
       - key: VITE_API_BASE_URL
-        fromService:
-          type: web
-          name: cloud-storage-backend
-          property: host
+        sync: false
 
 databases:
   # 3. PostgreSQL Database
