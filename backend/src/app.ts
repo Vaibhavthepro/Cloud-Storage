@@ -24,8 +24,8 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => {
-    // Skip rate limiting for chunk uploads since large files require more than 100 requests
-    return req.originalUrl.includes('/files/upload/chunk');
+    // Skip rate limiting for chunk uploads and admin endpoints
+    return req.originalUrl.includes('/files/upload/chunk') || req.originalUrl.includes('/api/admin');
   }
 });
 app.use('/api', limiter);

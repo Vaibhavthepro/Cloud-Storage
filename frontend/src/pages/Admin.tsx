@@ -2,14 +2,133 @@ import { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
-import { Users, HardDrive, ShieldCheck, Activity, Trash2, Shield } from 'lucide-react';
+import { Users, HardDrive, ShieldCheck, Activity, Trash2, Shield, Download, Plus, Minus } from 'lucide-react';
 
 const Admin = () => {
-  const { token, user: currentUser } = useContext(AuthContext);
+  const { token, user: currentUser, refreshUser } = useContext(AuthContext);
   const [stats, setStats] = useState<any>(null);
   const [users, setUsers] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'stats' | 'users'>('stats');
   const [usersLoading, setUsersLoading] = useState(false);
+  const [downloadFormat, setDownloadFormat] = useState<'JSON' | 'CSV' | 'TXT'>('JSON');
+  const [logsDownloading, setLogsDownloading] = useState(false);
+
+  const formatSize = (bytesStr: string) => {
+    const bytes = parseInt(bytesStr, 10);
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const handleAdjustQuota = async (userId: string, currentQuotaStr: string, currentUsedStr: string, changeInGb: number) => {
+    const currentQuota = BigInt(currentQuotaStr);
+    const currentUsed = BigInt(currentUsedStr);
+    
+    const oneGb = 1073741824n;
+    const changeBytes = BigInt(changeInGb) * oneGb;
+    const newQuota = currentQuota + changeBytes;
+    
+    if (newQuota < currentUsed) {
+      alert(`Cannot reduce quota below current used storage (${formatSize(currentUsed.toString())})`);
+      return;
+    }
+    
+    if (newQuota < oneGb) {
+      alert('Quota cannot be reduced below 1 GB');
+      return;
+    }
+
+    // Immediately update users state in UI for real-time responsiveness
+    setUsers(prevUsers => 
+      prevUsers.map(u => u.id === userId ? { ...u, storageQuota: newQuota.toString() } : u)
+    );
+    
+    try {
+      await axios.patch(`/api/admin/users/${userId}/quota`, {
+        storageQuota: newQuota.toString()
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      fetchUsers(true);
+      fetchStats();
+      if (refreshUser) {
+        refreshUser();
+      }
+    } catch (error: any) {
+      alert(error.response?.data?.message || 'Error adjusting storage quota');
+      fetchUsers(true);
+    }
+  };
+
+  const handleDownloadLogs = async () => {
+    try {
+      setLogsDownloading(true);
+      const res = await axios.get('/api/admin/logs', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const logs = res.data.data;
+      
+      let fileContent = '';
+      let mimeType = 'text/plain';
+      let fileName = `activity_logs_${new Date().toISOString().split('T')[0]}`;
+      
+      if (downloadFormat === 'JSON') {
+        fileContent = JSON.stringify(logs, null, 2);
+        mimeType = 'application/json';
+        fileName += '.json';
+      } else if (downloadFormat === 'CSV') {
+        mimeType = 'text/csv';
+        fileName += '.csv';
+        
+        const headers = ['ID', 'Timestamp', 'Operator Name', 'Operator Email', 'Action', 'Entity Type', 'Entity Name', 'IP Address'];
+        const csvRows = [headers.join(',')];
+        
+        logs.forEach((log: any) => {
+          const row = [
+            `"${log.id}"`,
+            `"${new Date(log.timestamp).toISOString()}"`,
+            `"${log.user?.name || 'Unknown'}"`,
+            `"${log.user?.email || 'Unknown'}"`,
+            `"${log.action}"`,
+            `"${log.entityType}"`,
+            `"${log.entityName || ''}"`,
+            `"${log.ipAddress || ''}"`
+          ];
+          csvRows.push(row.join(','));
+        });
+        fileContent = csvRows.join('\n');
+      } else if (downloadFormat === 'TXT') {
+        mimeType = 'text/plain';
+        fileName += '.txt';
+        
+        const txtLines = logs.map((log: any) => {
+          const dateStr = new Date(log.timestamp).toLocaleString();
+          const operator = `${log.user?.name || 'Unknown'} (${log.user?.email || 'Unknown'})`;
+          const entity = log.entityName ? `${log.entityType} "${log.entityName}"` : log.entityType;
+          return `[${dateStr}] Operator: ${operator} | Action: ${log.action} | Entity: ${entity} | IP: ${log.ipAddress || 'N/A'}`;
+        });
+        fileContent = txtLines.join('\n');
+      }
+      
+      const blob = new Blob([fileContent], { type: `${mimeType};charset=utf-8;` });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading activity logs', error);
+      alert('Failed to download system logs. Please check console for details.');
+    } finally {
+      setLogsDownloading(false);
+    }
+  };
 
   const fetchStats = async () => {
     try {
@@ -22,9 +141,9 @@ const Admin = () => {
     }
   };
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (silent = false) => {
     try {
-      setUsersLoading(true);
+      if (!silent) setUsersLoading(true);
       const res = await axios.get('/api/admin/users', {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -32,7 +151,7 @@ const Admin = () => {
     } catch (error) {
       console.error('Error fetching users list', error);
     } finally {
-      setUsersLoading(false);
+      if (!silent) setUsersLoading(false);
     }
   };
 
@@ -62,14 +181,7 @@ const Admin = () => {
     }
   };
 
-  const formatSize = (bytesStr: string) => {
-    const bytes = parseInt(bytesStr, 10);
-    if (!bytes || bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
+  // formatSize moved to top
 
   const formatQuotaPercent = (usedStr: string, quotaStr: string) => {
     const used = parseInt(usedStr, 10) || 0;
@@ -146,38 +258,37 @@ const Admin = () => {
               </div>
             </div>
 
-            <div className="glass-panel" style={{ padding: '1.5rem' }}>
-              <h3 style={{ marginBottom: '1.5rem' }}>Recent Activity Logs</h3>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
-                    <th style={{ padding: '1rem 0' }}>Action</th>
-                    <th>Entity Type</th>
-                    <th>Timestamp</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats?.recentActivity?.map((log: any) => (
-                    <tr key={log.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      <td style={{ padding: '1rem 0', fontWeight: 500 }}>
-                        {log.action}
-                        {log.entityName && (
-                          <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: '8px', fontSize: '0.85rem' }}>
-                            ({log.entityName})
-                          </span>
-                        )}
-                      </td>
-                      <td>{log.entityType}</td>
-                      <td className="text-muted">{new Date(log.timestamp).toLocaleString()}</td>
-                    </tr>
-                  ))}
-                  {(!stats?.recentActivity || stats.recentActivity.length === 0) && (
-                    <tr>
-                      <td colSpan={3} style={{ padding: '2rem 0', textAlign: 'center', color: 'var(--text-muted)' }}>No recent activity found.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+            <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
+              <h3 style={{ marginBottom: '1rem' }}>Activity Logs Security</h3>
+              <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.9rem', maxWidth: '600px', margin: '0 auto 1.5rem' }}>
+                System activity logs are hidden from the dashboard for privacy and security compliance. As an administrator, you can export and download the complete audit trails locally in your preferred format.
+              </p>
+              
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '1rem', background: 'rgba(0,0,0,0.15)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.25rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>Export Format</span>
+                  <select 
+                    value={downloadFormat}
+                    onChange={(e) => setDownloadFormat(e.target.value as any)}
+                    className="form-input" 
+                    style={{ padding: '0.5rem', width: '120px', background: '#090d16', border: '1px solid var(--border-color)' }}
+                  >
+                    <option value="JSON">JSON</option>
+                    <option value="CSV">CSV</option>
+                    <option value="TXT">TXT</option>
+                  </select>
+                </div>
+                
+                <button 
+                  onClick={handleDownloadLogs}
+                  className="btn btn-primary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.5rem', alignSelf: 'flex-end', height: '38px' }}
+                  disabled={logsDownloading}
+                >
+                  <Download size={16} />
+                  {logsDownloading ? 'Generating...' : 'Download Log'}
+                </button>
+              </div>
             </div>
           </>
         ) : (
@@ -233,7 +344,7 @@ const Admin = () => {
                           </span>
                         </td>
                         <td>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                               <span>{formatSize(item.storageUsed)}</span>
                               <span>{percent}%</span>
@@ -241,8 +352,26 @@ const Admin = () => {
                             <div style={{ width: '100%', height: '4px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '2px', overflow: 'hidden' }}>
                               <div style={{ width: `${percent}%`, height: '100%', background: 'var(--primary)', borderRadius: '2px' }} />
                             </div>
-                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                              Limit: {formatSize(item.storageQuota)}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', gap: '4px' }}>
+                              <span>Limit: {formatSize(item.storageQuota)}</span>
+                              <div style={{ display: 'flex', gap: '4px' }}>
+                                <button 
+                                  className="btn-ghost"
+                                  onClick={() => handleAdjustQuota(item.id, item.storageQuota, item.storageUsed, -1)}
+                                  style={{ padding: '2px 6px', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '2px', background: 'rgba(255,255,255,0.03)' }}
+                                  title="Decrease Limit by 1 GB"
+                                >
+                                  <Minus size={10} /> 1G
+                                </button>
+                                <button 
+                                  className="btn-ghost"
+                                  onClick={() => handleAdjustQuota(item.id, item.storageQuota, item.storageUsed, 1)}
+                                  style={{ padding: '2px 6px', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '2px', background: 'rgba(255,255,255,0.03)' }}
+                                  title="Increase Limit by 1 GB"
+                                >
+                                  <Plus size={10} /> 1G
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </td>

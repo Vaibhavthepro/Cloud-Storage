@@ -7,9 +7,9 @@ echo "Starting Backend Entrypoint script..."
 echo "Generating Prisma Client..."
 npx prisma generate
 
-# Run Prisma Migrations
-echo "Running Prisma Migrations..."
-npx prisma db push --accept-data-loss
+# Run Prisma Database Sync (Safe mode, preserves user data)
+echo "Syncing Prisma Database Schema..."
+npx prisma db push
 
 # (Optional) Seed the database here if you have a seed script
 # echo "Seeding database..."

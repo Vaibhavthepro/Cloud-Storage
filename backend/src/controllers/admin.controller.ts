@@ -128,3 +128,77 @@ const deleteFolderRecursive = (dirPath: string) => {
     fs.rmdirSync(dirPath);
   }
 };
+
+export const updateUserQuota = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const targetUserId = req.params.id as string;
+    const { storageQuota } = req.body;
+
+    if (storageQuota === undefined || isNaN(Number(storageQuota)) || Number(storageQuota) < 0) {
+      return next(new AppError('Invalid storage quota value', 400));
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, name: true, storageUsed: true }
+    });
+
+    if (!user) {
+      return next(new AppError('User not found', 404));
+    }
+
+    const newQuota = BigInt(storageQuota);
+    if (newQuota < user.storageUsed) {
+      return next(new AppError(`Cannot reduce quota below current storage used`, 400));
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: targetUserId },
+      data: { storageQuota: newQuota },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        storageQuota: true,
+        storageUsed: true,
+        createdAt: true,
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'User storage quota updated successfully',
+      data: {
+        ...updatedUser,
+        storageQuota: updatedUser.storageQuota.toString(),
+        storageUsed: updatedUser.storageUsed.toString(),
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getSystemLogs = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const logs = await prisma.activityLog.findMany({
+      orderBy: { timestamp: 'desc' },
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      data: logs
+    });
+  } catch (error) {
+    next(error);
+  }
+};
