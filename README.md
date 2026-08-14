@@ -1,8 +1,8 @@
-# CloudVault ☁️🔒
+# Jarvis Drive ☁️🔒
 
-![CloudVault Dashboard](./frontend/dashboard.png)
+![Jarvis Drive Dashboard](./frontend/dashboard.png)
 
-A modern, high-performance, and secure cloud storage platform. CloudVault enables users to effortlessly store, organize, and share their files and folders with real-time virus scanning and secure sharing capabilities.
+A modern, high-performance, and secure cloud storage platform. Jarvis Drive enables users to effortlessly store, organize, and share their files and folders with real-time virus scanning and secure sharing capabilities.
 
 ## ✨ Features
 
@@ -34,7 +34,7 @@ A modern, high-performance, and secure cloud storage platform. CloudVault enable
    Create a `.env` file in the root directory based on your setup. You will need variables for the PostgreSQL database, JWT secrets, etc.
 
 3. **Spin up the containers:**
-   CloudVault is fully containerized. Simply run the following command to build and start the entire stack:
+   Jarvis Drive is fully containerized. Simply run the following command to build and start the entire stack:
    ```bash
    docker-compose up -d --build
    ```

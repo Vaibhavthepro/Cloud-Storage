@@ -38,7 +38,7 @@ const Sidebar = () => {
     <div className="sidebar">
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2.5rem', padding: '0 0.5rem' }}>
         <Cloud size={32} style={{ color: 'var(--primary)' }} />
-        <h2 style={{ fontSize: '1.25rem', margin: 0 }}>CloudVault</h2>
+        <h2 style={{ fontSize: '1.25rem', margin: 0 }}>Jarvis Drive</h2>
       </div>
 
       <nav style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
