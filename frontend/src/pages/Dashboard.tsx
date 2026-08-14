@@ -93,6 +93,16 @@ const Dashboard = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    description?: string;
+    placeholder: string;
+    submitText: string;
+    onSubmit: (val: string) => void;
+  } | null>(null);
+  const [modalInputValue, setModalInputValue] = useState('');
+
   const toggleMenu = (id: string) => {
     setActiveMenuId((prev) => (prev === id ? null : id));
   };
@@ -297,17 +307,26 @@ const Dashboard = () => {
     fetchData();
   }, [searchQuery, token, currentFolder]);
 
-  const handleCreateFolder = async () => {
-    const name = window.prompt('Enter folder name:');
-    if (!name) return;
-    try {
-      await axios.post('/api/folders', { name, parentId: currentFolder }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      fetchData();
-    } catch (error: any) {
-      alert(error.response?.data?.message || 'Error creating folder');
-    }
+  const handleCreateFolder = () => {
+    setModalInputValue('');
+    setModalConfig({
+      isOpen: true,
+      title: 'Create New Folder',
+      description: 'Enter a name for your new folder:',
+      placeholder: 'Folder name...',
+      submitText: 'Create Folder',
+      onSubmit: async (name) => {
+        if (!name.trim()) return;
+        try {
+          await axios.post('/api/folders', { name: name.trim(), parentId: currentFolder }, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          fetchData();
+        } catch (error: any) {
+          alert(error.response?.data?.message || 'Error creating folder');
+        }
+      }
+    });
   };
 
   const handleUploadClick = () => {
@@ -590,32 +609,48 @@ const Dashboard = () => {
     }
   };
 
-  const handleShare = async (id: string) => {
-    const email = window.prompt('Enter the email address of the user you want to share with:');
-    if (!email) return;
-
-    try {
-      await axios.post('/api/shares/share', { fileId: id, email }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      alert('File shared successfully!');
-    } catch (error: any) {
-      alert(error.response?.data?.message || 'Error sharing file');
-    }
+  const handleShare = (id: string) => {
+    setModalInputValue('');
+    setModalConfig({
+      isOpen: true,
+      title: 'Share File',
+      description: 'Enter the email address of the user you want to share with:',
+      placeholder: 'user@example.com',
+      submitText: 'Share',
+      onSubmit: async (email) => {
+        if (!email.trim()) return;
+        try {
+          await axios.post('/api/shares/share', { fileId: id, email: email.trim() }, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          alert('File shared successfully!');
+        } catch (error: any) {
+          alert(error.response?.data?.message || 'Error sharing file');
+        }
+      }
+    });
   };
 
-  const handleShareFolder = async (id: string) => {
-    const email = window.prompt('Enter the email address of the user you want to share this folder with:');
-    if (!email) return;
-
-    try {
-      await axios.post('/api/shares/share-folder', { folderId: id, email }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      alert('Folder shared successfully!');
-    } catch (error: any) {
-      alert(error.response?.data?.message || 'Error sharing folder');
-    }
+  const handleShareFolder = (id: string) => {
+    setModalInputValue('');
+    setModalConfig({
+      isOpen: true,
+      title: 'Share Folder',
+      description: 'Enter the email address of the user you want to share this folder with:',
+      placeholder: 'user@example.com',
+      submitText: 'Share Folder',
+      onSubmit: async (email) => {
+        if (!email.trim()) return;
+        try {
+          await axios.post('/api/shares/share-folder', { folderId: id, email: email.trim() }, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          alert('Folder shared successfully!');
+        } catch (error: any) {
+          alert(error.response?.data?.message || 'Error sharing folder');
+        }
+      }
+    });
   };
 
   const formatSize = (bytesStr: string | number) => {
@@ -1011,6 +1046,69 @@ const Dashboard = () => {
           </div>
         )}
       </div>
+      {modalConfig?.isOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.65)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999
+        }} onClick={() => setModalConfig(null)}>
+          <div className="glass-panel" style={{
+            width: '90%',
+            maxWidth: '420px',
+            padding: '2rem',
+            borderRadius: '16px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+            border: '1px solid rgba(255,255,255,0.1)'
+          }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem', color: 'var(--text-main)' }}>{modalConfig.title}</h3>
+            {modalConfig.description && (
+              <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+                {modalConfig.description}
+              </p>
+            )}
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              modalConfig.onSubmit(modalInputValue);
+              setModalConfig(null);
+            }}>
+              <input
+                type="text"
+                className="form-input"
+                style={{ width: '100%', padding: '0.75rem', marginBottom: '1.5rem', background: '#090d16', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}
+                placeholder={modalConfig.placeholder}
+                value={modalInputValue}
+                onChange={(e) => setModalInputValue(e.target.value)}
+                autoFocus
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => setModalConfig(null)}
+                  style={{ padding: '0.5rem 1rem' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{ padding: '0.5rem 1.25rem' }}
+                >
+                  {modalConfig.submitText}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       <UploadManager
         uploads={uploads}
         onPause={handlePauseUpload}
