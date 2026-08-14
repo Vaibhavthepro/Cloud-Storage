@@ -33,7 +33,7 @@ services:
         fromService:
           type: web
           name: cloud-storage-backend
-          property: url
+          property: host
 
 databases:
   # 3. PostgreSQL Database
