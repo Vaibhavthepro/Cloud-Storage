@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import ws from 'ws';
 import { StorageProvider, StorageMetadata } from './StorageProvider';
 import { AppError } from '../../utils/AppError';
 import { Readable } from 'stream';
@@ -20,6 +21,10 @@ export class SupabaseStorageService implements StorageProvider {
     this.supabase = createClient(supabaseUrl, supabaseSecretKey, {
       auth: {
         persistSession: false,
+        autoRefreshToken: false,
+      },
+      realtime: {
+        transport: ws,
       },
     });
   }
