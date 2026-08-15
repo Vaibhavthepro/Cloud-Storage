@@ -95,7 +95,7 @@ export const deleteUser = async (req: Request | any, res: Response, next: NextFu
 
     // 4. Delete physical files from disk (performed after DB transaction succeeds to prevent data loss on rollback)
     for (const storagePath of pathsToDelete) {
-      await storageService.delete(storagePath).catch((err) => {
+      await storageService.delete(storagePath).catch((err: any) => {
         console.error(`Failed to delete physical file from disk at ${storagePath}:`, err);
       });
     }

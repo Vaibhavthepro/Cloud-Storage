@@ -1,6 +1,8 @@
 node_modules
 dist
-storage/
+/storage/
+/backend/storage/
+!src/services/storage/
 
 # Keep environment variables out of version control
 .env
