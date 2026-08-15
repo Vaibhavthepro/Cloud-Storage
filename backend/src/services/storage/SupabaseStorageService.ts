@@ -24,7 +24,7 @@ export class SupabaseStorageService implements StorageProvider {
         autoRefreshToken: false,
       },
       realtime: {
-        transport: ws,
+        transport: ws as any,
       },
     });
   }
