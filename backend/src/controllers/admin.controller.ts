@@ -3,9 +3,9 @@ import path from 'path';
 import fs from 'fs';
 import prisma from '../config/db';
 import { AppError } from '../utils/AppError';
-import { LocalStorageService } from '../services/storage/LocalStorageService';
+import { getStorageProvider } from '../services/storage/StorageFactory';
 
-const storageService = new LocalStorageService();
+const storageService = getStorageProvider();
 const TEMP_DIR = path.join(__dirname, '../../../storage/temp_chunks');
 
 export const getUsers = async (req: Request, res: Response, next: NextFunction) => {

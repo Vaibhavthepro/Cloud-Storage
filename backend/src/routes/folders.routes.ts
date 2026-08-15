@@ -4,9 +4,9 @@ import { authenticate } from '../middleware/auth.middleware';
 import { AppError } from '../utils/AppError';
 import { hasFolderAccess } from '../utils/permissions';
 
-import { LocalStorageService } from '../services/storage/LocalStorageService';
+import { getStorageProvider } from '../services/storage/StorageFactory';
 
-const storageService = new LocalStorageService();
+const storageService = getStorageProvider();
 
 export const createFolder = async (req: Request | any, res: Response, next: NextFunction) => {
   try {

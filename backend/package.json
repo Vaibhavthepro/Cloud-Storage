@@ -8,15 +8,20 @@
     "start": "node dist/server.js",
     "build": "tsc",
     "dev": "nodemon src/server.ts",
-    "reset-password": "ts-node src/scripts/reset-password.ts"
+    "reset-password": "ts-node src/scripts/reset-password.ts",
+    "migrate-to-r2": "ts-node src/scripts/migrate-to-r2.ts",
+    "migrate-to-supabase": "ts-node src/scripts/migrate-to-supabase.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.750.0",
+    "@aws-sdk/lib-storage": "^3.750.0",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
+    "@supabase/supabase-js": "^2.49.0",
     "archiver": "^8.0.0",
     "bcrypt": "^6.0.0",
     "clamscan": "^2.4.0",

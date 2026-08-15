@@ -2,16 +2,17 @@ import path from 'path';
 import crypto from 'crypto';
 import fs from 'fs';
 import prisma from '../config/db';
-import { LocalStorageService } from './storage/LocalStorageService';
+import { StorageProvider } from './storage/StorageProvider';
+import { getStorageProvider } from './storage/StorageFactory';
 import { VirusScannerService } from './VirusScannerService';
 import { AppError } from '../utils/AppError';
 
 export class FileService {
-  private storageService: LocalStorageService;
+  private storageService: StorageProvider;
   private virusScanner: VirusScannerService;
 
   constructor() {
-    this.storageService = new LocalStorageService();
+    this.storageService = getStorageProvider();
     this.virusScanner = new VirusScannerService();
   }
 

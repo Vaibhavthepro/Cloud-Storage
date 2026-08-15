@@ -11,8 +11,28 @@ app.set('trust proxy', 1);
 
 // Security Middleware
 app.use(helmet());
+
+const allowedOrigins = [
+  'https://cloud-storage-frontend-faa8.onrender.com',
+  process.env.FRONTEND_URL,
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:5173',
+].filter(Boolean) as string[];
+
 app.use(cors({
-  origin: '*', // Adjust for production
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g. mobile apps, curl, UptimeRobot, server-to-server)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Range'],
+  exposedHeaders: ['Content-Range', 'Content-Length', 'Content-Disposition'],
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -48,7 +68,7 @@ app.use('/api/shares', sharesRoutes);
 app.use('/api/admin', adminRoutes);
 
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'UP', message: 'Cloud Storage API is running' });
+  res.status(200).json({ status: 'ok', message: 'Backend is running' });
 });
 
 // Error handling

@@ -2,7 +2,8 @@ import path from 'path';
 import crypto from 'crypto';
 import fs from 'fs';
 import prisma from '../config/db';
-import { LocalStorageService } from './storage/LocalStorageService';
+import { StorageProvider } from './storage/StorageProvider';
+import { getStorageProvider } from './storage/StorageFactory';
 import { VirusScannerService } from './VirusScannerService';
 import { AppError } from '../utils/AppError';
 
@@ -11,11 +12,11 @@ const CHUNK_SIZE = process.env.CHUNK_SIZE ? parseInt(process.env.CHUNK_SIZE) : 1
 const TEMP_DIR = path.join(__dirname, '../../../storage/temp_chunks');
 
 export class ChunkUploadService {
-  private storageService: LocalStorageService;
+  private storageService: StorageProvider;
   private virusScanner: VirusScannerService;
 
   constructor() {
-    this.storageService = new LocalStorageService();
+    this.storageService = getStorageProvider();
     this.virusScanner = new VirusScannerService();
     if (!fs.existsSync(TEMP_DIR)) {
       fs.mkdirSync(TEMP_DIR, { recursive: true });
