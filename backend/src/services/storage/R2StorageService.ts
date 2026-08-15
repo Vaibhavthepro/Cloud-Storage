@@ -43,7 +43,7 @@ export class R2StorageService implements StorageProvider {
         params: {
           Bucket: this.bucketName,
           Key: filePath,
-          Body: fileStream,
+          Body: fileStream as any,
         },
       });
 
