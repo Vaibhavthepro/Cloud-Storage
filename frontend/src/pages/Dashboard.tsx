@@ -35,9 +35,11 @@ const ImagePreview: React.FC<ImagePreviewProps> = ({ fileId, token, alt }) => {
 
   useEffect(() => {
     let objectUrl = '';
+    let isMounted = true;
+
     const fetchImage = async () => {
-      if (!fileId) {
-        setError(true);
+      if (!fileId || !token) {
+        if (isMounted) setError(true);
         return;
       }
       try {
@@ -45,19 +47,30 @@ const ImagePreview: React.FC<ImagePreviewProps> = ({ fileId, token, alt }) => {
           headers: { Authorization: `Bearer ${token}` },
           responseType: 'blob'
         });
-        objectUrl = window.URL.createObjectURL(res.data);
-        setSrc(objectUrl);
-        setError(false);
-      } catch (err) {
-        console.error("Failed to load image preview", err);
-        setError(true);
+        if (isMounted) {
+          objectUrl = window.URL.createObjectURL(res.data);
+          setSrc(objectUrl);
+          setError(false);
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          if (err.response?.status === 404) {
+            console.warn(`Image preview 404 for file ${fileId}: Storage file not found`);
+          } else {
+            console.warn("Failed to load image preview:", err.message || err);
+          }
+          setError(true);
+        }
       }
     };
 
     fetchImage();
 
     return () => {
-      if (objectUrl) window.URL.revokeObjectURL(objectUrl);
+      isMounted = false;
+      if (objectUrl) {
+        window.URL.revokeObjectURL(objectUrl);
+      }
     };
   }, [fileId, token]);
 
@@ -101,7 +114,14 @@ const ImagePreview: React.FC<ImagePreviewProps> = ({ fileId, token, alt }) => {
     );
   }
 
-  return <img src={src} alt={alt} style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '12px' }} />;
+  return (
+    <img 
+      src={src} 
+      alt={alt} 
+      style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '12px' }} 
+      onError={() => setError(true)}
+    />
+  );
 };
 
 const Dashboard = () => {
