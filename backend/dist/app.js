@@ -32,7 +32,16 @@ app.use((0, cors_1.default)({
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Range'],
+    allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'X-Requested-With',
+        'Range',
+        'x-upload-id',
+        'x-chunk-index',
+        'x-chunk-checksum',
+        'x-chunk-size'
+    ],
     exposedHeaders: ['Content-Range', 'Content-Length', 'Content-Disposition'],
 }));
 app.use(express_1.default.json());
