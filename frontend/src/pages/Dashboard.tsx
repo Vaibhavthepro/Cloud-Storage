@@ -148,8 +148,10 @@ const Dashboard = () => {
     isOpen: boolean;
     title: string;
     description?: string;
-    placeholder: string;
+    placeholder?: string;
     submitText: string;
+    isConfirm?: boolean;
+    danger?: boolean;
     onSubmit: (val: string) => void;
   } | null>(null);
   const [modalInputValue, setModalInputValue] = useState('');
@@ -587,17 +589,27 @@ const Dashboard = () => {
     await uploadFilesAndFolders(filesToUpload);
   };
 
-  const handleDelete = async (id: string, type: 'file' | 'folder') => {
-    if (!window.confirm(`Are you sure you want to delete this ${type}?`)) return;
-    try {
-      await axios.delete(`/api/${type}s/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      fetchData();
-      refreshUser();
-    } catch (error) {
-      console.error('Error deleting', error);
-    }
+  const handleDelete = (id: string, type: 'file' | 'folder') => {
+    setModalInputValue('');
+    setModalConfig({
+      isOpen: true,
+      title: `Delete ${type === 'file' ? 'File' : 'Folder'}`,
+      description: `Are you sure you want to delete this ${type}? This action cannot be undone.`,
+      submitText: 'Delete',
+      danger: true,
+      isConfirm: true,
+      onSubmit: async () => {
+        try {
+          await axios.delete(`/api/${type}s/${id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          fetchData();
+          refreshUser();
+        } catch (error) {
+          console.error('Error deleting', error);
+        }
+      }
+    });
   };
 
   const handleToggleStarFile = async (id: string) => {
@@ -1122,7 +1134,7 @@ const Dashboard = () => {
           }} onClick={(e) => e.stopPropagation()}>
             <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem', color: 'var(--text-main)' }}>{modalConfig.title}</h3>
             {modalConfig.description && (
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+              <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '1.25rem', whiteSpace: 'pre-wrap' }}>
                 {modalConfig.description}
               </p>
             )}
@@ -1131,16 +1143,18 @@ const Dashboard = () => {
               modalConfig.onSubmit(modalInputValue);
               setModalConfig(null);
             }}>
-              <input
-                type="text"
-                className="form-input"
-                style={{ width: '100%', padding: '0.75rem', marginBottom: '1.5rem', background: '#090d16', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}
-                placeholder={modalConfig.placeholder}
-                value={modalInputValue}
-                onChange={(e) => setModalInputValue(e.target.value)}
-                autoFocus
-              />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              {!modalConfig.isConfirm && (
+                <input
+                  type="text"
+                  className="form-input"
+                  style={{ width: '100%', padding: '0.75rem', marginBottom: '1.5rem', background: '#090d16', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}
+                  placeholder={modalConfig.placeholder || ''}
+                  value={modalInputValue}
+                  onChange={(e) => setModalInputValue(e.target.value)}
+                  autoFocus
+                />
+              )}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: modalConfig.isConfirm ? '1.5rem' : 0 }}>
                 <button
                   type="button"
                   className="btn btn-ghost"
@@ -1151,8 +1165,12 @@ const Dashboard = () => {
                 </button>
                 <button
                   type="submit"
-                  className="btn btn-primary"
-                  style={{ padding: '0.5rem 1.25rem' }}
+                  className={`btn ${modalConfig.danger ? '' : 'btn-primary'}`}
+                  style={{ 
+                    padding: '0.5rem 1.25rem',
+                    background: modalConfig.danger ? 'var(--danger)' : undefined,
+                    color: 'white'
+                  }}
                 >
                   {modalConfig.submitText}
                 </button>

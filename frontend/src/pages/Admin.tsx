@@ -168,20 +168,30 @@ const Admin = () => {
     }
   }, [activeTab, token]);
 
-  const handleDeleteUser = async (id: string, name: string) => {
-    const message = `WARNING: Are you sure you want to delete user "${name}"?\n\nThis will permanently delete all folders, files, shares, and activity logs owned by this user. This action CANNOT be undone.`;
-    if (!window.confirm(message)) return;
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+  } | null>(null);
 
-    try {
-      await axios.delete(`/api/admin/users/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      alert(`User "${name}" and all associated data have been deleted successfully.`);
-      fetchUsers();
-      fetchStats();
-    } catch (error: any) {
-      alert(error.response?.data?.message || 'Error deleting user');
-    }
+  const handleDeleteUser = (id: string, name: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete User Account',
+      description: `WARNING: Are you sure you want to delete user "${name}"?\n\nThis will permanently delete all folders, files, shares, and activity logs owned by this user. This action CANNOT be undone.`,
+      onConfirm: async () => {
+        try {
+          await axios.delete(`/api/admin/users/${id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          fetchUsers(true);
+          fetchStats();
+        } catch (error: any) {
+          alert(error.response?.data?.message || 'Error deleting user');
+        }
+      }
+    });
   };
 
   // formatSize moved to top
@@ -421,6 +431,56 @@ const Admin = () => {
           </div>
         )}
       </div>
+      {confirmModal?.isOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.65)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999
+        }} onClick={() => setConfirmModal(null)}>
+          <div className="glass-panel" style={{
+            width: '90%',
+            maxWidth: 'calc(100vw - 32px)',
+            padding: '1.5rem',
+            borderRadius: '16px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+            border: '1px solid rgba(255,255,255,0.1)'
+          }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem', color: 'var(--text-main)' }}>{confirmModal.title}</h3>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '1.5rem', whiteSpace: 'pre-wrap' }}>
+              {confirmModal.description}
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setConfirmModal(null)}
+                style={{ padding: '0.5rem 1rem' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  confirmModal.onConfirm();
+                  setConfirmModal(null);
+                }}
+                style={{ padding: '0.5rem 1.25rem', background: 'var(--danger)', color: 'white' }}
+              >
+                Delete User
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
