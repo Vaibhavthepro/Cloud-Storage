@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext, useRef } from 'react';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
+import Header from '../components/Header';
 import { FileText, Folder as FolderIcon, Upload, Trash2, Download, Search, Share2, MoreHorizontal, Image as ImageIcon, FileArchive as FileArchiveIcon, Database as DatabaseIcon, Code as CodeIcon, Star } from 'lucide-react';
 import { UploadManager } from '../components/UploadManager';
 import type { UploadItem } from '../components/UploadManager';
@@ -30,10 +31,15 @@ interface ImagePreviewProps {
 
 const ImagePreview: React.FC<ImagePreviewProps> = ({ fileId, token, alt }) => {
   const [src, setSrc] = useState<string>('');
+  const [error, setError] = useState<boolean>(false);
 
   useEffect(() => {
     let objectUrl = '';
     const fetchImage = async () => {
+      if (!fileId) {
+        setError(true);
+        return;
+      }
       try {
         const res = await axios.get(`/api/files/${fileId}/download`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -41,8 +47,10 @@ const ImagePreview: React.FC<ImagePreviewProps> = ({ fileId, token, alt }) => {
         });
         objectUrl = window.URL.createObjectURL(res.data);
         setSrc(objectUrl);
+        setError(false);
       } catch (err) {
         console.error("Failed to load image preview", err);
+        setError(true);
       }
     };
 
@@ -52,6 +60,27 @@ const ImagePreview: React.FC<ImagePreviewProps> = ({ fileId, token, alt }) => {
       if (objectUrl) window.URL.revokeObjectURL(objectUrl);
     };
   }, [fileId, token]);
+
+  if (error) {
+    return (
+      <div style={{ 
+        width: '100%', 
+        height: '150px', 
+        display: 'flex', 
+        flexDirection: 'column',
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        background: 'rgba(255,255,255,0.03)', 
+        borderRadius: '12px',
+        border: '1px solid rgba(255,255,255,0.05)',
+        fontSize: '0.8rem',
+        color: 'var(--text-muted)'
+      }}>
+        <ImageIcon size={28} style={{ opacity: 0.5, marginBottom: '6px' }} />
+        <span>Preview unavailable</span>
+      </div>
+    );
+  }
 
   if (!src) {
     return (
@@ -80,7 +109,9 @@ const Dashboard = () => {
   const queryParams = new URLSearchParams(window.location.search);
   const initialFolder = queryParams.get('folder');
 
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [files, setFiles] = useState<FileItem[]>([]);
+
   const [folders, setFolders] = useState<FolderItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentFolder, setCurrentFolder] = useState<string | null>(initialFolder);
@@ -667,9 +698,10 @@ const Dashboard = () => {
 
   return (
     <div className="app-container">
-      <Sidebar />
+      <Header onOpenSidebar={() => setSidebarOpen(true)} />
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="main-content">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             {currentFolder && (
               <button className="btn-ghost" onClick={() => setCurrentFolder(null)} style={{ padding: '0.5rem', cursor: 'pointer', border: 'none', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}>
@@ -679,27 +711,27 @@ const Dashboard = () => {
             <h1 style={{ fontSize: '1.75rem', margin: 0 }}>My Storage</h1>
           </div>
           
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <div style={{ position: 'relative' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', width: '100%', maxWidth: '100%', flex: '1 1 auto', justifyContent: 'flex-end' }}>
+            <div style={{ position: 'relative', flex: '1 1 200px', minWidth: '180px' }}>
               <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input 
                 type="text" 
                 className="form-input" 
                 placeholder="Search files..." 
-                style={{ paddingLeft: '2.5rem', width: '250px' }}
+                style={{ paddingLeft: '2.5rem', width: '100%' }}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <button className="btn btn-secondary" onClick={handleCreateFolder}>
+            <button className="btn btn-secondary" onClick={handleCreateFolder} style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
               <FolderIcon size={18} />
               New Folder
             </button>
-            <button className="btn btn-secondary" onClick={handleFolderUploadClick} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button className="btn btn-secondary" onClick={handleFolderUploadClick} style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
               <Upload size={18} />
               Upload Folder
             </button>
-            <button className="btn btn-primary" onClick={handleUploadClick} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button className="btn btn-primary" onClick={handleUploadClick} style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
               <Upload size={18} />
               Upload File
             </button>
@@ -765,7 +797,7 @@ const Dashboard = () => {
                 </h3>
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))',
                   gap: '1.5rem',
                   marginBottom: '2.5rem'
                 }}>
@@ -885,7 +917,7 @@ const Dashboard = () => {
                 <h3 style={{ marginBottom: '1.25rem', fontSize: '1.2rem', textAlign: 'left' }}>Folders</h3>
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 180px), 1fr))',
                   gap: '1.5rem',
                   marginBottom: '2.5rem'
                 }}>
@@ -968,7 +1000,7 @@ const Dashboard = () => {
             ) : (
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 200px), 1fr))',
                 gap: '1.5rem'
               }}>
                 {files.map((file) => (
@@ -1062,8 +1094,8 @@ const Dashboard = () => {
         }} onClick={() => setModalConfig(null)}>
           <div className="glass-panel" style={{
             width: '90%',
-            maxWidth: '420px',
-            padding: '2rem',
+            maxWidth: 'calc(100vw - 32px)',
+            padding: '1.5rem',
             borderRadius: '16px',
             boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
             border: '1px solid rgba(255,255,255,0.1)'

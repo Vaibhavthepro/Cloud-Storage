@@ -26,6 +26,7 @@ router.get('/', (req, res, next) => __awaiter(void 0, void 0, void 0, function* 
         });
         const fileCount = yield db_1.default.file.count({ where: { ownerId: userId } });
         const folderCount = yield db_1.default.folder.count({ where: { ownerId: userId } });
+        const totalUsers = yield db_1.default.user.count();
         const recentActivity = yield db_1.default.activityLog.findMany({
             where: { userId },
             orderBy: { timestamp: 'desc' },
@@ -38,6 +39,7 @@ router.get('/', (req, res, next) => __awaiter(void 0, void 0, void 0, function* 
                 storageQuota: user === null || user === void 0 ? void 0 : user.storageQuota.toString(),
                 fileCount,
                 folderCount,
+                totalUsers,
                 recentActivity
             }
         });

@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
+import Header from '../components/Header';
 import { FileText, Download, Folder as FolderIcon } from 'lucide-react';
 
 interface SharedFileItem {
@@ -20,6 +21,7 @@ interface SharedFileItem {
 const Shared = () => {
   const { token } = useContext(AuthContext);
   const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sharedFiles, setSharedFiles] = useState<SharedFileItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -100,14 +102,15 @@ const Shared = () => {
 
   return (
     <div className="app-container">
-      <Sidebar />
+      <Header onOpenSidebar={() => setSidebarOpen(true)} />
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="main-content">
-        <h1 style={{ fontSize: '1.75rem', marginBottom: '2rem' }}>Shared With Me</h1>
+        <h1 style={{ fontSize: '1.75rem', marginBottom: '1.5rem' }}>Shared With Me</h1>
         
         {loading ? (
           <div>Loading...</div>
         ) : (
-          <div className="glass-panel" style={{ padding: '1.5rem', flex: 1, minHeight: '60vh' }}>
+          <div className="glass-panel" style={{ padding: '1.25rem', flex: 1, minHeight: '60vh' }}>
             <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', color: 'var(--secondary)' }}>Transfer Requests</h2>
             <div className="file-grid" style={{ marginBottom: '2rem' }}>
               {sharedFiles.filter(f => f.status === 'PENDING').length === 0 && <p className="text-muted" style={{ gridColumn: '1 / -1' }}>No pending transfer requests.</p>}

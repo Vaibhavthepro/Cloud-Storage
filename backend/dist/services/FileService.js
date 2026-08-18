@@ -17,12 +17,12 @@ const path_1 = __importDefault(require("path"));
 const crypto_1 = __importDefault(require("crypto"));
 const fs_1 = __importDefault(require("fs"));
 const db_1 = __importDefault(require("../config/db"));
-const LocalStorageService_1 = require("./storage/LocalStorageService");
+const StorageFactory_1 = require("./storage/StorageFactory");
 const VirusScannerService_1 = require("./VirusScannerService");
 const AppError_1 = require("../utils/AppError");
 class FileService {
     constructor() {
-        this.storageService = new LocalStorageService_1.LocalStorageService();
+        this.storageService = (0, StorageFactory_1.getStorageProvider)();
         this.virusScanner = new VirusScannerService_1.VirusScannerService();
     }
     calculateHash(filePath) {
@@ -73,7 +73,9 @@ class FileService {
                 else {
                     // Move temp file to permanent storage
                     const permanentPath = path_1.default.join('uploads', `${fileHash}-${file.originalname}`);
-                    yield this.storageService.move(tempPath, permanentPath);
+                    const readStream = fs_1.default.createReadStream(tempPath);
+                    yield this.storageService.upload(permanentPath, readStream);
+                    fs_1.default.unlinkSync(tempPath);
                     // Create new physical storage record
                     physicalStorage = yield db_1.default.physicalStorage.create({
                         data: {
@@ -112,7 +114,8 @@ class FileService {
                         userId,
                         action: 'UPLOAD_FILE',
                         entityType: 'FILE',
-                        entityId: newFile.id
+                        entityId: newFile.id,
+                        entityName: newFile.originalName
                     }
                 });
                 return newFile;
@@ -125,7 +128,7 @@ class FileService {
             }
         });
     }
-    getDownloadStream(fileId, userId) {
+    getDownloadStream(fileId, userId, options) {
         return __awaiter(this, void 0, void 0, function* () {
             const file = yield db_1.default.file.findUnique({
                 where: { id: fileId },
@@ -139,7 +142,14 @@ class FileService {
             if (file.ownerId !== userId) {
                 throw new AppError_1.AppError('Unauthorized access to file', 403);
             }
-            const stream = yield this.storageService.download(file.physicalFile.storagePath);
+            if (!file.physicalFile) {
+                throw new AppError_1.AppError('Physical file record not found', 404);
+            }
+            const exists = yield this.storageService.exists(file.physicalFile.storagePath);
+            if (!exists) {
+                throw new AppError_1.AppError('File content not found in storage', 404);
+            }
+            const stream = yield this.storageService.download(file.physicalFile.storagePath, options);
             return { stream, filename: file.originalName, mimeType: file.mimeType };
         });
     }
@@ -178,7 +188,8 @@ class FileService {
                         userId,
                         action: 'DELETE_FILE',
                         entityType: 'FILE',
-                        entityId: fileId
+                        entityId: fileId,
+                        entityName: file.originalName
                     }
                 });
             }));

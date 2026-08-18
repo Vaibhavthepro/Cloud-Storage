@@ -17,16 +17,27 @@ const clamscan_1 = __importDefault(require("clamscan"));
 class VirusScannerService {
     constructor() {
         this.scanner = null;
+        this.isInitialized = false;
+        this.initializationAttempted = false;
         this.init();
     }
     init() {
         return __awaiter(this, void 0, void 0, function* () {
+            if (this.initializationAttempted)
+                return;
+            this.initializationAttempted = true;
+            if (process.env.CLAMAV_ENABLED === 'false') {
+                console.log('[VirusScanner] ClamAV scanning explicitly disabled via CLAMAV_ENABLED=false');
+                return;
+            }
+            const host = process.env.CLAMAV_HOST || 'localhost';
+            const port = parseInt(process.env.CLAMAV_PORT || '3310', 10);
             try {
                 this.scanner = yield new clamscan_1.default().init({
                     clamdscan: {
-                        host: process.env.CLAMAV_HOST || 'localhost',
-                        port: parseInt(process.env.CLAMAV_PORT || '3310'),
-                        timeout: 60000,
+                        host,
+                        port,
+                        timeout: 5000,
                         localFallback: false,
                         path: '/usr/bin/clamdscan',
                         multiscan: true,
@@ -34,19 +45,24 @@ class VirusScannerService {
                         active: true,
                         bypassTest: false,
                     },
-                    preference: 'clamdscan'
+                    preference: 'clamdscan',
                 });
-                console.log('ClamAV Scanner initialized successfully');
+                this.isInitialized = true;
+                console.log(`[VirusScanner] ClamAV Scanner initialized successfully at ${host}:${port}`);
             }
             catch (err) {
-                console.error('Failed to initialize ClamAV Scanner:', err);
+                this.isInitialized = false;
+                this.scanner = null;
+                console.warn(`[VirusScanner] ClamAV daemon is not reachable at ${host}:${port} (${err.code || err.message}). Skipping virus scan.`);
             }
         });
     }
     scanFile(filePath) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (!this.scanner) {
-                console.warn('Scanner not initialized, skipping scan.');
+            if (!this.initializationAttempted) {
+                yield this.init();
+            }
+            if (!this.scanner || !this.isInitialized) {
                 return { isInfected: false, viruses: [] };
             }
             try {
@@ -54,9 +70,7 @@ class VirusScannerService {
                 return { isInfected, viruses };
             }
             catch (err) {
-                console.error('Error scanning file:', err);
-                // In production, you might want to fail closed (treat as infected or error out)
-                // but for development resilience, returning false here if clamav is unreachable.
+                console.error('[VirusScanner] Error scanning file:', err.message || err);
                 return { isInfected: false, viruses: [] };
             }
         });

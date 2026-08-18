@@ -44,13 +44,13 @@ class LocalStorageService {
             return fullPath;
         });
     }
-    download(filePath) {
+    download(filePath, options) {
         return __awaiter(this, void 0, void 0, function* () {
             const fullPath = this.getFullPath(filePath);
             if (!fs_1.default.existsSync(fullPath)) {
                 throw new Error('File not found');
             }
-            return fs_1.default.createReadStream(fullPath);
+            return fs_1.default.createReadStream(fullPath, options);
         });
     }
     delete(filePath) {

@@ -1,9 +1,14 @@
-import { useContext } from 'react';
+import React, { useContext } from 'react';
 import { NavLink } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { Cloud, Folder, HardDrive, LogOut, ShieldAlert } from 'lucide-react';
+import { Cloud, Folder, HardDrive, LogOut, ShieldAlert, X } from 'lucide-react';
 
-const Sidebar = () => {
+interface SidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
   const { user, logout } = useContext(AuthContext);
 
   const formatSize = (bytesStr: string | number | undefined) => {
@@ -34,19 +39,44 @@ const Sidebar = () => {
     fontWeight: isActive ? 500 : 400,
   });
 
-  return (
+  const handleNavClick = () => {
+    if (onClose) {
+      onClose();
+    }
+  };
+
+  const handleLogout = () => {
+    if (onClose) {
+      onClose();
+    }
+    logout();
+  };
+
+  const sidebarContent = (
     <div className="sidebar">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2.5rem', padding: '0 0.5rem' }}>
-        <Cloud size={32} style={{ color: 'var(--primary)' }} />
-        <h2 style={{ fontSize: '1.25rem', margin: 0 }}>Jarvis Drive</h2>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2.5rem', padding: '0 0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <Cloud size={32} style={{ color: 'var(--primary)' }} />
+          <h2 style={{ fontSize: '1.25rem', margin: 0 }}>Jarvis Drive</h2>
+        </div>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="mobile-header-btn"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            aria-label="Close sidebar"
+          >
+            <X size={22} />
+          </button>
+        )}
       </div>
 
       <nav style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <NavLink to="/dashboard" style={({ isActive }) => navItemStyle(isActive)}>
+        <NavLink to="/dashboard" style={({ isActive }) => navItemStyle(isActive)} onClick={handleNavClick}>
           <HardDrive size={20} />
           My Storage
         </NavLink>
-        <NavLink to="/shared" style={({ isActive }) => navItemStyle(isActive)}>
+        <NavLink to="/shared" style={({ isActive }) => navItemStyle(isActive)} onClick={handleNavClick}>
           <Folder size={20} />
           Shared with me
         </NavLink>
@@ -56,7 +86,7 @@ const Sidebar = () => {
             <div style={{ margin: '1.5rem 0 0.5rem', padding: '0 1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>
               Administration
             </div>
-            <NavLink to="/admin" style={({ isActive }) => navItemStyle(isActive)}>
+            <NavLink to="/admin" style={({ isActive }) => navItemStyle(isActive)} onClick={handleNavClick}>
               <ShieldAlert size={20} />
               Admin Panel
             </NavLink>
@@ -81,7 +111,7 @@ const Sidebar = () => {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', padding: '0 0.5rem' }}>
           <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
-            {user?.name.charAt(0).toUpperCase()}
+            {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
           </div>
           <div style={{ overflow: 'hidden' }}>
             <div style={{ fontWeight: 500, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{user?.name}</div>
@@ -89,7 +119,7 @@ const Sidebar = () => {
           </div>
         </div>
         <button 
-          onClick={logout}
+          onClick={handleLogout}
           className="btn-ghost" 
           style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', borderRadius: '8px', cursor: 'pointer', border: 'none', color: 'var(--text-muted)', justifyContent: 'flex-start' }}
         >
@@ -98,6 +128,20 @@ const Sidebar = () => {
         </button>
       </div>
     </div>
+  );
+
+  return (
+    <>
+      {/* Mobile Drawer Overlay */}
+      <div 
+        className={`sidebar-overlay ${isOpen ? 'open' : ''}`} 
+        onClick={onClose} 
+      />
+      {/* Mobile Drawer / Desktop Static Sidebar */}
+      <div className={`sidebar-drawer-container ${isOpen ? 'open' : ''}`}>
+        {sidebarContent}
+      </div>
+    </>
   );
 };
 

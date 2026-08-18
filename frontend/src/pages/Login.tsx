@@ -33,8 +33,8 @@ const Login = () => {
   };
 
   return (
-    <div className="app-container" style={{ justifyContent: 'center', alignItems: 'center' }}>
-      <div className="glass-panel animate-fade-in" style={{ padding: '3rem', width: '100%', maxWidth: '420px' }}>
+    <div className="app-container" style={{ justifyContent: 'center', alignItems: 'center', padding: '1rem' }}>
+      <div className="glass-panel animate-fade-in" style={{ padding: '2rem 1.5rem', width: '100%', maxWidth: '420px', margin: 'auto' }}>
         
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <Cloud size={48} className="text-primary" style={{ margin: '0 auto', color: 'var(--primary)' }} />

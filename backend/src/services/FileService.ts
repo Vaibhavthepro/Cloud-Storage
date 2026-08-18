@@ -149,6 +149,15 @@ export class FileService {
         throw new AppError('Unauthorized access to file', 403);
     }
 
+    if (!file.physicalFile) {
+      throw new AppError('Physical file record not found', 404);
+    }
+
+    const exists = await this.storageService.exists(file.physicalFile.storagePath);
+    if (!exists) {
+      throw new AppError('File content not found in storage', 404);
+    }
+
     const stream = await this.storageService.download(file.physicalFile.storagePath, options);
     return { stream, filename: file.originalName, mimeType: file.mimeType };
   }
