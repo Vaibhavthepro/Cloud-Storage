@@ -84,9 +84,71 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       return next(new AppError('Invalid credentials', 401));
     }
 
+    // Check if account is locked out
+    if (user.lockoutUntil && user.lockoutUntil > new Date()) {
+      const minutesLeft = Math.ceil((user.lockoutUntil.getTime() - Date.now()) / (60 * 1000));
+      return next(
+        new AppError(
+          `Account is temporarily locked due to multiple failed login attempts. Please try again in ${minutesLeft} minute(s).`,
+          403
+        )
+      );
+    }
+
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
+      const newFailedAttempts = user.failedLoginAttempts + 1;
+      const MAX_FAILED_ATTEMPTS = 5;
+      const LOCKOUT_MINUTES = 15;
+
+      let isNowLocked = false;
+      let lockoutDate: Date | null = null;
+
+      if (newFailedAttempts >= MAX_FAILED_ATTEMPTS) {
+        isNowLocked = true;
+        lockoutDate = new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000);
+      }
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          failedLoginAttempts: newFailedAttempts,
+          lockoutUntil: lockoutDate,
+        },
+      });
+
+      await prisma.activityLog.create({
+        data: {
+          userId: user.id,
+          action: isNowLocked ? 'ACCOUNT_LOCKED' : 'FAILED_LOGIN',
+          entityType: 'USER',
+          entityId: user.id,
+          entityName: user.name,
+          ipAddress: req.ip,
+        },
+      });
+
+      if (isNowLocked) {
+        return next(
+          new AppError(
+            `Account locked due to 5 consecutive failed login attempts. Please try again in ${LOCKOUT_MINUTES} minutes.`,
+            403
+          )
+        );
+      }
+
       return next(new AppError('Invalid credentials', 401));
+    }
+
+    // Reset failed count and lockout status on successful login
+    if (user.failedLoginAttempts > 0 || user.lockoutUntil) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          failedLoginAttempts: 0,
+          lockoutUntil: null,
+        },
+      });
     }
 
     await prisma.activityLog.create({

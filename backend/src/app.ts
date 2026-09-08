@@ -59,6 +59,20 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
+// Strict Auth Rate Limiting (10 requests per 15 minutes window)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: {
+    success: false,
+    message: 'Too many authentication attempts from this IP. Please try again after 15 minutes.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+
 import authRoutes from './routes/auth.routes';
 import fileRoutes from './routes/files.routes';
 import folderRoutes from './routes/folders.routes';
