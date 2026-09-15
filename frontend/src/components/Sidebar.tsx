@@ -132,7 +132,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
             border: '1px solid rgba(239, 68, 68, 0.3)', 
             color: '#ef4444', 
             background: 'rgba(239, 68, 68, 0.1)', 
-            justify: 'center', 
+            justifyContent: 'center', 
             fontWeight: 500, 
             fontSize: '0.875rem' 
           }}
