@@ -54,10 +54,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
 
   const sidebarContent = (
     <div className="sidebar">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2.5rem', padding: '0 0.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', padding: '0 0.25rem', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <Cloud size={32} style={{ color: 'var(--primary)' }} />
-          <h2 style={{ fontSize: '1.25rem', margin: 0 }}>Jarvis Drive</h2>
+          <Cloud size={28} style={{ color: 'var(--primary)' }} />
+          <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Jarvis Drive</h2>
         </div>
         {onClose && (
           <button
@@ -71,7 +71,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
         )}
       </div>
 
-      <nav style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', minHeight: 0 }}>
         <NavLink to="/dashboard" style={({ isActive }) => navItemStyle(isActive)} onClick={handleNavClick}>
           <HardDrive size={20} />
           My Storage
@@ -83,7 +83,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
         
         {user?.role === 'ADMIN' && (
           <>
-            <div style={{ margin: '1.5rem 0 0.5rem', padding: '0 1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>
+            <div style={{ margin: '1rem 0 0.5rem', padding: '0 1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>
               Administration
             </div>
             <NavLink to="/admin" style={({ isActive }) => navItemStyle(isActive)} onClick={handleNavClick}>
@@ -94,14 +94,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
         )}
       </nav>
 
-      <div style={{ padding: '1.5rem 0 0', borderTop: '1px solid var(--border-color)' }}>
+      <div style={{ padding: '0.875rem 0 0', borderTop: '1px solid var(--border-color)', marginTop: 'auto', flexShrink: 0 }}>
         {/* Storage quota progress bar */}
-        <div style={{ padding: '0 0.5rem', marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.5rem', fontWeight: 500 }}>
+        <div style={{ padding: '0 0.25rem', marginBottom: '0.875rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.35rem', fontWeight: 500 }}>
             <span style={{ color: 'var(--text-muted)' }}>Storage Used</span>
             <span>{percent}%</span>
           </div>
-          <div style={{ width: '100%', height: '6px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '3px', overflow: 'hidden', marginBottom: '0.5rem' }}>
+          <div style={{ width: '100%', height: '6px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '3px', overflow: 'hidden', marginBottom: '0.35rem' }}>
             <div style={{ width: `${percent}%`, height: '100%', background: 'var(--primary)', borderRadius: '3px' }} />
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -109,19 +109,33 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', padding: '0 0.5rem' }}>
-          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', padding: '0 0.25rem' }}>
+          <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.875rem', flexShrink: 0 }}>
             {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
           </div>
-          <div style={{ overflow: 'hidden' }}>
-            <div style={{ fontWeight: 500, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{user?.name}</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{user?.role}</div>
+          <div style={{ overflow: 'hidden', flex: 1 }}>
+            <div style={{ fontWeight: 500, fontSize: '0.875rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{user?.name}</div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{user?.role}</div>
           </div>
         </div>
         <button 
           onClick={handleLogout}
-          className="btn-ghost" 
-          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', borderRadius: '8px', cursor: 'pointer', border: 'none', color: 'var(--text-muted)', justifyContent: 'flex-start' }}
+          className="btn" 
+          style={{ 
+            width: '100%', 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '0.5rem', 
+            padding: '0.65rem 0.75rem', 
+            borderRadius: '8px', 
+            cursor: 'pointer', 
+            border: '1px solid rgba(239, 68, 68, 0.3)', 
+            color: '#ef4444', 
+            background: 'rgba(239, 68, 68, 0.1)', 
+            justify: 'center', 
+            fontWeight: 500, 
+            fontSize: '0.875rem' 
+          }}
         >
           <LogOut size={18} />
           Sign Out

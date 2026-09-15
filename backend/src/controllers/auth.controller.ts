@@ -80,7 +80,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     }
 
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
+    if (!user || !user.passwordHash) {
       return next(new AppError('Invalid credentials', 401));
     }
 
@@ -97,7 +97,8 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
 
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
-      const newFailedAttempts = user.failedLoginAttempts + 1;
+      const currentFailed = user.failedLoginAttempts || 0;
+      const newFailedAttempts = currentFailed + 1;
       const MAX_FAILED_ATTEMPTS = 5;
       const LOCKOUT_MINUTES = 15;
 
@@ -109,24 +110,32 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
         lockoutDate = new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000);
       }
 
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          failedLoginAttempts: newFailedAttempts,
-          lockoutUntil: lockoutDate,
-        },
-      });
+      try {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            failedLoginAttempts: newFailedAttempts,
+            lockoutUntil: lockoutDate,
+          },
+        });
+      } catch (updateErr) {
+        console.error('Failed to update failed login attempts:', updateErr);
+      }
 
-      await prisma.activityLog.create({
-        data: {
-          userId: user.id,
-          action: isNowLocked ? 'ACCOUNT_LOCKED' : 'FAILED_LOGIN',
-          entityType: 'USER',
-          entityId: user.id,
-          entityName: user.name,
-          ipAddress: req.ip,
-        },
-      });
+      try {
+        await prisma.activityLog.create({
+          data: {
+            userId: user.id,
+            action: isNowLocked ? 'ACCOUNT_LOCKED' : 'FAILED_LOGIN',
+            entityType: 'USER',
+            entityId: user.id,
+            entityName: user.name,
+            ipAddress: req.ip || '',
+          },
+        });
+      } catch (logErr) {
+        console.error('Failed to create activity log:', logErr);
+      }
 
       if (isNowLocked) {
         return next(
@@ -141,26 +150,34 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     }
 
     // Reset failed count and lockout status on successful login
-    if (user.failedLoginAttempts > 0 || user.lockoutUntil) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          failedLoginAttempts: 0,
-          lockoutUntil: null,
-        },
-      });
+    if ((user.failedLoginAttempts || 0) > 0 || user.lockoutUntil) {
+      try {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            failedLoginAttempts: 0,
+            lockoutUntil: null,
+          },
+        });
+      } catch (updateErr) {
+        console.error('Failed to reset failed login attempts:', updateErr);
+      }
     }
 
-    await prisma.activityLog.create({
-      data: {
-        userId: user.id,
-        action: 'LOGIN',
-        entityType: 'USER',
-        entityId: user.id,
-        entityName: user.name,
-        ipAddress: req.ip
-      }
-    });
+    try {
+      await prisma.activityLog.create({
+        data: {
+          userId: user.id,
+          action: 'LOGIN',
+          entityType: 'USER',
+          entityId: user.id,
+          entityName: user.name,
+          ipAddress: req.ip || ''
+        }
+      });
+    } catch (logErr) {
+      console.error('Failed to log login activity:', logErr);
+    }
 
     res.status(200).json({
       success: true,

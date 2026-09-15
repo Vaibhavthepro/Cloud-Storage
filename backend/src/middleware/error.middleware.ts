@@ -18,8 +18,11 @@ export const errorHandler = (err: any, req: Request, res: Response, next: NextFu
     });
   }
 
+  const errorMessage = err.message || 'Internal server error';
+
   return res.status(500).json({
     success: false,
-    message: 'Internal server error',
+    message: errorMessage,
+    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack }),
   });
 };
