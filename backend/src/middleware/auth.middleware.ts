@@ -30,7 +30,16 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
 
     req.user = user;
     next();
-  } catch (error) {
+  } catch (error: any) {
+    if (error.name === 'TokenExpiredError') {
+      return next(new AppError('Token expired, please log in again', 401));
+    }
+    if (error.name === 'JsonWebTokenError') {
+      return next(new AppError('Invalid token format', 401));
+    }
+    if (error instanceof AppError) {
+      return next(error);
+    }
     return next(new AppError('Not authorized, token failed', 401));
   }
 };
