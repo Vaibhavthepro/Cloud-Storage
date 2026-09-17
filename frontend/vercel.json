@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://cloud-storage-backend-gtpf.onrender.com/api/$1"
+      "destination": "https://cloud-storage-backend-sica.onrender.com/api/$1"
     },
     {
       "source": "/(.*)",
